@@ -13,6 +13,17 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+enum Role {
+  student
+  instructor
+  admin
+}
+
+enum VerificationTokenPurpose {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  PHONE_VERIFICATION
+}
 
 model users {
   user_id       Int      @id @default(autoincrement())
@@ -22,4 +33,18 @@ model users {
   phone         String
   role          String   @default("student")
   created_at    DateTime @default(now())
+  is_email_verified Boolean @default(false)
+  is_phone_verified Boolean @default(false)
+  verification_tokens verification_tokens[]
+
+
+}
+
+model verification_tokens {
+  token_id   Int      @id @default(autoincrement())
+  user_id    Int
+  token      String   @unique
+  expires_at DateTime
+  purpose    VerificationTokenPurpose
+  user       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
