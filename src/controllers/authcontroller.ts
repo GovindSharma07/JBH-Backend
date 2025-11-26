@@ -27,6 +27,8 @@ class AuthController {
         return res.status(400).json({ message: "Invalid phone number format. Must be E.164 (e.g., +919876543210)." });
       }
 
+      const e164Phone = `+91${phone}`;
+
       const existingUser = await AuthService.findUserByEmail(email);
       if (existingUser)
         return res.status(400).json({ message: "User already exists" });
@@ -61,11 +63,19 @@ class AuthController {
     }
   };
 
-  static verifyEmail = async (req: Request, res: Response) => {
+static verifyEmail = async (req: Request, res: Response) => {
     try {
-      const { token } = req.body;
-      if (!token) throw new BadRequestError("Missing verification token.");
-      await AuthService.verifyEmail(token as string);
+      // MODIFIED: Expecting email and code, not a single token
+      const { email, code } = req.body;
+      if (!email || !code) {
+        throw new BadRequestError("Email and verification code are required.");
+      }
+      // Added basic check for 6-digit code consistency
+      if (code.length !== 6 || isNaN(Number(code))) {
+         throw new BadRequestError("Invalid code format. Expected 6 digits.");
+      }
+
+      await AuthService.verifyEmail(email as string, code as string);
       return res.status(200).json({ message: "Email verified successfully." });
     } catch (error) {
       if (error instanceof ApiError) {

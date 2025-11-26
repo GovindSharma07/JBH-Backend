@@ -1,13 +1,13 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "../generated/prisma/client";
-import { users } from "../generated/prisma/client";
+import { PrismaClient, users, VerificationTokenPurpose } from "../generated/prisma/client";
 import jwt from "jsonwebtoken";
-import { generateSecureToken } from "../utils/token";
+import { generateSecureToken, generateNumericCode } from "../utils/token";
 import EmailService from "./emailService";
 import SmsService from "./smsService";
 import {
   InvalidCredentialsError,
   EmailNotVerifiedError,
+  PhoneNotVerifiedError, // IMPORTED NEW ERROR
   UserNotFoundError,
   TokenExpiredError,
   BadRequestError,
@@ -24,8 +24,10 @@ class AuthService {
     phone: string
   ): Promise<users> => {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const emailToken = generateSecureToken();
-    const tokenExpires = new Date(Date.now() + 3600000 * 24); // 24 hours
+    // NEW: Use numeric code for email verification OTP (6 digits)
+    const emailOtpCode = generateNumericCode(6); 
+    // NEW: Set a short expiry for OTP (e.g., 10 minutes = 600000 ms)
+    const tokenExpires = new Date(Date.now() + 600000); 
 
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.users.create({
@@ -39,22 +41,63 @@ class AuthService {
         },
       });
 
+      // Store the short OTP code in the 'token' field
       await tx.verification_tokens.create({
         data: {
           user_id: user.user_id,
-          token: emailToken,
+          token: emailOtpCode, // Store 6-digit code here
           expires_at: tokenExpires,
-          purpose: "EMAIL_VERIFICATION",
+          purpose: VerificationTokenPurpose.EMAIL_VERIFICATION,
         },
       });
       return user;
     });
 
-    EmailService.sendVerificationEmail(email, emailToken).catch(console.error);
-    SmsService.sendVerificationOtp(phone).catch(console.error);
+    // Send the OTP code instead of the long token/link
+    EmailService.sendVerificationEmail(email, emailOtpCode).catch(console.error);
+    SmsService.sendVerificationOtp(phone).catch(console.error); 
     return newUser;
   };
 
+  // MODIFIED: Accepts email and code for verification
+  static verifyEmail = async (email: string, code: string) => {
+    const user = await prisma.users.findUnique({ where: { email } });
+    if (!user) throw new UserNotFoundError("User not found");
+    if (user.is_email_verified) {
+      throw new BadRequestError("Email is already verified");
+    }
+
+    // Find the latest unexpired EMAIL_VERIFICATION token for the user
+    const verificationToken = await prisma.verification_tokens.findFirst({
+      where: { 
+          user_id: user.user_id, 
+          purpose: VerificationTokenPurpose.EMAIL_VERIFICATION,
+          expires_at: {
+              gt: new Date()
+          }
+      },
+      orderBy: { token_id: 'desc' }
+    });
+
+    // Check if a token exists and the provided code matches
+    if (!verificationToken || verificationToken.token !== code) {
+      throw new InvalidCredentialsError("Invalid or expired verification code.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.users.update({
+        where: { user_id: user.user_id },
+        data: { is_email_verified: true },
+      });
+      // Delete all tokens for this purpose after successful verification
+      await tx.verification_tokens.deleteMany({
+        where: { user_id: user.user_id, purpose: VerificationTokenPurpose.EMAIL_VERIFICATION },
+      });
+    });
+    return true;
+  };
+  
+  // verifyPhone remains largely the same, but the calling controller must be updated
   static verifyPhone = async (email: string, code: string): Promise<boolean> => {
     const user = await prisma.users.findUnique({ where: { email } });
     if (!user) throw new UserNotFoundError("User not found");
@@ -82,6 +125,10 @@ class AuthService {
     if (!user.is_email_verified) {
       throw new EmailNotVerifiedError("Please verify your email before logging in.");
     }
+    // NEW: Check phone verification and use the specific error
+    if (!user.is_phone_verified) {
+        throw new PhoneNotVerifiedError("Please verify your phone number before logging in.");
+    }
 
     const token = jwt.sign(
       { userId: user.user_id, role: user.role },
@@ -89,26 +136,6 @@ class AuthService {
       { expiresIn: "1h" }
     );
     return token;
-  };
-
-  static verifyEmail = async (token: string) => {
-    const verificationToken = await prisma.verification_tokens.findUnique({
-      where: { token: token, purpose: "EMAIL_VERIFICATION" },
-    });
-    if (!verificationToken || verificationToken.expires_at < new Date()) {
-      throw new TokenExpiredError("Token is invalid or has expired.");
-    }
-
-    await prisma.$transaction(async (tx) => {
-      await tx.users.update({
-        where: { user_id: verificationToken.user_id },
-        data: { is_email_verified: true },
-      });
-      await tx.verification_tokens.delete({
-        where: { token_id: verificationToken.token_id },
-      });
-    });
-    return true;
   };
 
   static requestPasswordReset = async (email: string) => {

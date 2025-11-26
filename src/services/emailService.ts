@@ -10,32 +10,32 @@ if (process.env.SENDGRID_API_KEY) {
 const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@jbh-academy.com";
 
 class EmailService {
-  static async sendVerificationEmail(to: string, token: string) {
-    const verificationUrl = `http://your-frontend-app.com/verify-email?token=${token}`;
+  static async sendVerificationEmail(to: string, code: string) {
     
     const msg = {
       to: to,
       from: FROM_EMAIL, // Use your verified sender
-      subject: "JBH Tech Academy: Verify Your Email",
+      subject: "JBH Tech Academy: Your Verification Code",
       html: `
         <h1>Welcome to JBH Tech Academy!</h1>
-        <p>Please click the link below to verify your email address:</p>
-        <a href="${verificationUrl}">${verificationUrl}</a>
+        <p>Your email verification code is:</p>
+        <h2>${code}</h2>
+        <p>Please use this code in the app to verify your email address. This code is valid for 10 minutes.</p>
       `,
     };
 
     try {
       if (process.env.SENDGRID_API_KEY) {
         await sgMail.send(msg);
-        console.log(`Verification email sent to ${to}`);
+        console.log(`Verification code email sent to ${to}`);
       } else {
-        console.log(`SIMULATE: Verification email sent to ${to} (URL: ${verificationUrl})`);
+        console.log(`SIMULATE: Verification code sent to ${to} (Code: ${code})`);
       }
     } catch (error) {
       console.error("Error sending verification email:", error);
     }
   }
-
+  
   static async sendPasswordResetEmail(to: string, token: string) {
     const resetUrl = `http://your-frontend-app.com/reset-password?token=${token}`;
 

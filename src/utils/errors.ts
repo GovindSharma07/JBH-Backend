@@ -39,3 +39,10 @@ export class TokenExpiredError extends ApiError {
       super(message, 400);
     }
   }
+
+  // NEW: Error for unverified phone
+export class PhoneNotVerifiedError extends ApiError {
+  constructor(message: string = "Phone number not verified. Please verify your phone.") {
+    super(message, 403); // 403 Forbidden
+  }
+}

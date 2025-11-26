@@ -22,6 +22,7 @@ class SmsService {
     }
 
     try {
+      phone = "+91" + phone.replace(/^\+91/, ''); // Ensure E.164 format for India
       await twilioClient.verify.v2.services(verifyServiceSid)
         .verifications
         .create({ to: phone, channel: 'sms' });
@@ -47,6 +48,7 @@ class SmsService {
     }
 
     try {
+      phone = "+91" + phone.replace(/^\+91/, '');
       const check = await twilioClient.verify.v2.services(verifyServiceSid)
         .verificationChecks
         .create({ to: phone, code: code });
