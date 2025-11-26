@@ -9,40 +9,27 @@ import {
 import {
   ApiError,
   BadRequestError,
+  EmailNotVerifiedError,
+  PhoneNotVerifiedError
 } from "../utils/errors";
 
 class AuthController {
-  static signup = async (req: Request, res: Response) => {
+static signup = async (req: Request, res: Response) => {
     try {
       const { full_name, email, password, phone } = req.body;
-      if (!validateEmail(email)) {
-        return res.status(400).json({ message: "Invalid email format." });
-      }
-      if (!validatePassword(password)) {
-        return res.status(400).json({ 
-          message: "Password must be at least 8 characters long and include one uppercase, one lowercase, and one number." 
-        });
-      }
-      if (!validatePhone(phone)) {
-        return res.status(400).json({ message: "Invalid phone number format. Must be E.164 (e.g., +919876543210)." });
-      }
-
-      const e164Phone = `+91${phone}`;
+      if (!validateEmail(email)) return res.status(400).json({ message: "Invalid email format." });
+      if (!validatePassword(password)) return res.status(400).json({ message: "Password weak." });
+      if (!validatePhone(phone)) return res.status(400).json({ message: "Invalid phone." });
 
       const existingUser = await AuthService.findUserByEmail(email);
-      if (existingUser)
-        return res.status(400).json({ message: "User already exists" });
+      if (existingUser) return res.status(400).json({ message: "User already exists" });
 
-      const newUser = await AuthService.registerUser(
-        full_name, email, password, phone
-      );
-
+      const newUser = await AuthService.registerUser(full_name, email, password, phone);
       const { password_hash, ...userResponse } = newUser;
       return res.status(201).json({
-        message: "User registered. Please check your email and phone for verification.",
+        message: "User registered. Please verify.",
         user: userResponse,
       });
-
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: "Internal server error" });
@@ -50,11 +37,30 @@ class AuthController {
   };
 
   static login = async (req: Request, res: Response) => {
-    try {
-      const { email, password } = req.body;
+    const { email, password } = req.body;
+    try { 
       const token = await AuthService.loginUser(email, password);
       return res.status(200).json({ message: "Login successful", token: token });
     } catch (error) {
+      // --- UPDATED LOGIC ---
+      if (error instanceof EmailNotVerifiedError || error instanceof PhoneNotVerifiedError) {
+        // 1. Trigger resend
+        await AuthService.resendVerificationOtps(email);
+        
+        // 2. Fetch user to know specifically WHICH one is missing
+        const user = await AuthService.findUserByEmail(email);
+
+        return res.status(403).json({ 
+            message: "Account not verified. Codes resent.", 
+            needsVerification: true,
+            email: email,
+            // Send status flags to frontend
+            isEmailVerified: user?.is_email_verified ?? false,
+            isPhoneVerified: user?.is_phone_verified ?? false
+        });
+      }
+      // ---------------------
+
       if (error instanceof ApiError) {
         return res.status(error.statusCode).json({ message: error.message });
       }
@@ -63,25 +69,26 @@ class AuthController {
     }
   };
 
-static verifyEmail = async (req: Request, res: Response) => {
+  static resendOtp = async (req: Request, res: Response) => {
     try {
-      // MODIFIED: Expecting email and code, not a single token
-      const { email, code } = req.body;
-      if (!email || !code) {
-        throw new BadRequestError("Email and verification code are required.");
-      }
-      // Added basic check for 6-digit code consistency
-      if (code.length !== 6 || isNaN(Number(code))) {
-         throw new BadRequestError("Invalid code format. Expected 6 digits.");
-      }
-
-      await AuthService.verifyEmail(email as string, code as string);
-      return res.status(200).json({ message: "Email verified successfully." });
+      const { email } = req.body;
+      if (!email) throw new BadRequestError("Email is required.");
+      await AuthService.resendVerificationOtps(email);
+      return res.status(200).json({ message: "Codes resent." });
     } catch (error) {
-      if (error instanceof ApiError) {
-        return res.status(error.statusCode).json({ message: error.message });
-      }
-      console.error(error);
+      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  };
+
+  static verifyEmail = async (req: Request, res: Response) => {
+    try {
+      const { email, code } = req.body;
+      if (!email || !code) throw new BadRequestError("Email and code required.");
+      await AuthService.verifyEmail(email, code);
+      return res.status(200).json({ message: "Email verified." });
+    } catch (error) {
+      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -89,16 +96,11 @@ static verifyEmail = async (req: Request, res: Response) => {
   static verifyPhone = async (req: Request, res: Response) => {
     try {
       const { email, code } = req.body;
-      if (!email || !code) {
-        throw new BadRequestError("Email and code are required.");
-      }
+      if (!email || !code) throw new BadRequestError("Email and code required.");
       await AuthService.verifyPhone(email, code);
-      return res.status(200).json({ message: "Phone verified successfully." });
+      return res.status(200).json({ message: "Phone verified." });
     } catch (error) {
-      if (error instanceof ApiError) {
-        return res.status(error.statusCode).json({ message: error.message });
-      }
-      console.error(error);
+      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -108,31 +110,21 @@ static verifyEmail = async (req: Request, res: Response) => {
       const { email } = req.body;
       if (!email) throw new BadRequestError("Email is required.");
       await AuthService.requestPasswordReset(email);
-      return res.status(200).json({ 
-          message: "If an account with that email exists, a password reset link has been sent." 
-      });
+      return res.status(200).json({ message: "OTP sent if account exists." });
     } catch (error) {
-      console.error(error);
       return res.status(500).json({ message: "Internal server error" });
     }
   };
 
   static resetPassword = async (req: Request, res: Response) => {
     try {
-      const { token, newPassword } = req.body;
-      if (!token || !newPassword) {
-        throw new BadRequestError("Token and newPassword are required.");
-      }
-      if (!validatePassword(newPassword)) {
-        throw new BadRequestError("Password does not meet requirements.");
-      }
-      await AuthService.resetPassword(token, newPassword);
-      return res.status(200).json({ message: "Password has been reset successfully." });
+      const { email, otp, newPassword } = req.body;
+      if (!email || !otp || !newPassword) throw new BadRequestError("All fields required.");
+      if (!validatePassword(newPassword)) throw new BadRequestError("Password weak.");
+      await AuthService.resetPassword(email, otp, newPassword);
+      return res.status(200).json({ message: "Password reset successful." });
     } catch (error) {
-      if (error instanceof ApiError) {
-        return res.status(error.statusCode).json({ message: error.message });
-      }
-      console.error(error);
+      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -140,14 +132,11 @@ static verifyEmail = async (req: Request, res: Response) => {
   static getMe = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const jwtPayload = req.user as { userId: number };
-      if (!jwtPayload || !jwtPayload.userId) {
-          return res.status(401).json({ message: "Invalid user token" });
-      }
+      if (!jwtPayload?.userId) return res.status(401).json({ message: "Invalid token" });
       const user = await AuthService.findUserById(jwtPayload.userId);
       if (!user) return res.status(404).json({ message: "User not found" });
       res.status(200).json(user);
     } catch (error) {
-      console.error(error);
       res.status(500).json({ message: "Internal server Error" });
     }
   };

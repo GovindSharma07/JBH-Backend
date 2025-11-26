@@ -10,6 +10,7 @@ router.post("/auth/login", AuthController.login);
 // --- Verification & Password Reset ---
 router.post("/auth/verify-email", AuthController.verifyEmail);
 router.post("/auth/verify-phone", AuthController.verifyPhone);
+router.post("/auth/resend-otp", AuthController.resendOtp);
 router.post("/auth/forgot-password", AuthController.forgotPassword);
 router.post("/auth/reset-password", AuthController.resetPassword);
 
