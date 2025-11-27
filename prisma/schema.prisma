@@ -25,6 +25,11 @@ enum VerificationTokenPurpose {
   PHONE_VERIFICATION
 }
 
+enum ApplicationStatus{
+  applied
+  not_applied
+}
+
 model users {
   user_id       Int      @id @default(autoincrement())
   full_name     String?
@@ -36,7 +41,7 @@ model users {
   is_email_verified Boolean @default(false)
   is_phone_verified Boolean @default(false)
   verification_tokens verification_tokens[]
-
+  apprenticeship_applications apprenticeship_applications[]
 
 }
 
@@ -47,4 +52,29 @@ model verification_tokens {
   expires_at DateTime
   purpose    VerificationTokenPurpose
   user       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
+model apprenticeships {
+  apprenticeship_id Int      @id @default(autoincrement())
+  company_name      String   @db.VarChar(255)
+  image_url        String   @db.VarChar(500)
+  title             String   @db.VarChar(255)
+  description       String   @db.Text
+  location          String   @db.VarChar(255)
+  stipend           Decimal  @db.Decimal(10, 2)
+  posted_at         DateTime @default(now())
+
+  applications      apprenticeship_applications[]
+}
+
+model apprenticeship_applications {
+  application_id    Int      @id @default(autoincrement())
+  user_id           Int
+  apprenticeship_id Int
+  status            ApplicationStatus   @default(not_applied)
+  submitted_at      DateTime @default(now())
+
+  // Relations
+  user              users           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  apprenticeship    apprenticeships @relation(fields: [apprenticeship_id], references: [apprenticeship_id], onDelete: Cascade)
 }
