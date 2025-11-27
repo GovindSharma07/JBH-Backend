@@ -1,11 +1,29 @@
-// src/controllers/resumeController.ts
 import { Response } from "express";
 import { AuthenticatedRequest } from "../utils/types";
 import ResumeService from "../services/resumeService";
+import { generatePresignedUploadUrl } from "../utils/storage";
 import { ApiError, BadRequestError } from "../utils/errors";
 
 class ResumeController {
   
+  // Step 1: Frontend requests a URL to upload file to B2
+  static getUploadUrl = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { fileName, fileType } = req.body;
+      
+      if (!fileName || !fileType) {
+        throw new BadRequestError("File name and type are required");
+      }
+
+      const data = await generatePresignedUploadUrl(fileName, fileType);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.error("Presigned URL Error:", error);
+      return res.status(500).json({ message: "Could not generate upload URL" });
+    }
+  };
+
+  // Step 2: Frontend confirms upload and saves metadata to DB
   static uploadResume = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userPayload = req.user as { userId: number };
@@ -18,7 +36,7 @@ class ResumeController {
       const resume = await ResumeService.addResume(userPayload.userId, { name, file_url });
       
       return res.status(201).json({
-        message: "Resume uploaded successfully",
+        message: "Resume saved successfully",
         data: resume
       });
     } catch (error) {
