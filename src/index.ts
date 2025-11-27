@@ -5,6 +5,7 @@ dotenv.config();
 
 import AuthRoutes from './routes/authroutes'; 
 import ApprenticeshipRoutes from './routes/apprenticeshipRoutes'; // <--- Import this
+import ResumeRoutes from './routes/resumeRoutes'; // <--- Import Resume Routes
 
 const app = express();
 app.use(cors({origin: ['http://localhost:3000']})); // Allow Flutter web or specific origin
@@ -15,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 // Register Routes
 app.use('/api', AuthRoutes);
 app.use('/api', ApprenticeshipRoutes); // <--- Register this
+app.use('/api', ResumeRoutes); // <--- Register Resume Routes
 
 // To start the server
 const port = process.env.PORT || 3000;

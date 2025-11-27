@@ -26,8 +26,10 @@ enum VerificationTokenPurpose {
 }
 
 enum ApplicationStatus{
-  applied
-  not_applied
+  pending
+  reviewed
+  accepted
+  rejected
 }
 
 model users {
@@ -41,6 +43,8 @@ model users {
   is_email_verified Boolean @default(false)
   is_phone_verified Boolean @default(false)
   verification_tokens verification_tokens[]
+
+  resumes  resumes[]
   apprenticeship_applications apprenticeship_applications[]
 
 }
@@ -54,14 +58,26 @@ model verification_tokens {
   user       users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
 
+model resumes {
+  resume_id    Int      @id @default(autoincrement())
+  user_id      Int
+  name         String   @db.VarChar(100) // e.g., "Frontend CV", "Backend CV"
+  file_url     String   @db.VarChar(500) // The Cloudflare/B2 URL
+  uploaded_at  DateTime @default(now())
+
+  user         users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+}
+
 model apprenticeships {
   apprenticeship_id Int      @id @default(autoincrement())
   company_name      String   @db.VarChar(255)
-  image_url        String   @db.VarChar(500)
+  image_url         String   @db.VarChar(500)
   title             String   @db.VarChar(255)
   description       String   @db.Text
   location          String   @db.VarChar(255)
+  duration          String?  @db.VarChar(100) // Added for frontend detail screen
   stipend           Decimal  @db.Decimal(10, 2)
+  is_active         Boolean  @default(true)   // To filter "Open" positions
   posted_at         DateTime @default(now())
 
   applications      apprenticeship_applications[]
@@ -71,7 +87,9 @@ model apprenticeship_applications {
   application_id    Int      @id @default(autoincrement())
   user_id           Int
   apprenticeship_id Int
-  status            ApplicationStatus   @default(not_applied)
+  status            ApplicationStatus   @default(pending)
+  resume_url        String  @db.VarChar(500) // For Resume Upload
+  message           String?  @db.Text         // For optional message
   submitted_at      DateTime @default(now())
 
   // Relations
