@@ -2,6 +2,7 @@
 
 import { PrismaClient } from "../generated/prisma/client";
 import { ApiError, BadRequestError } from "../utils/errors";
+import redisClient from "../utils/redisClient";
 import ResumeService from "./resumeService";
 
 const prisma = new PrismaClient();
@@ -18,7 +19,7 @@ class ApprenticeshipService {
     stipend: number;
     image_url: string;
   }) {
-    return await prisma.apprenticeships.create({
+    const newJob = await prisma.apprenticeships.create({
       data: {
         company_name: data.company_name,
         title: data.title,
@@ -30,25 +31,42 @@ class ApprenticeshipService {
         is_active: true
       },
     });
+
+    await redisClient.del("apprenticeships:all");
+    return newJob;
   }
 
   // Student: Get all open positions with "Applied" status
-  static async getAllApprenticeships(userId: number) {
-    // 1. Get all active apprenticeships
-    const allPositions = await prisma.apprenticeships.findMany({
-      where: { is_active: true },
-      orderBy: { posted_at: 'desc' },
-    });
+ static async getAllApprenticeships(userId: number) {
+    const cacheKey = "apprenticeships:all";
 
-    // 2. Get applications for THIS user
+    // 1. Try to get the MASTER LIST from Redis
+    let allPositions;
+    const cachedData = await redisClient.get(cacheKey);
+
+    if (cachedData) {
+      // HIT: Parse data from Redis
+      allPositions = JSON.parse(cachedData);
+    } else {
+      // MISS: Fetch from Database
+      allPositions = await prisma.apprenticeships.findMany({
+        where: { is_active: true },
+        orderBy: { posted_at: 'desc' },
+      });
+
+      // Write to Redis (Expire in 1 hour or 1 day)
+      await redisClient.setEx(cacheKey, 3600, JSON.stringify(allPositions));
+    }
+
+    // 2. Fetch User's Applications (Always from DB, but fast)
+    // This query is lightweight compared to fetching the full job list
     const userApplications = await prisma.apprenticeship_applications.findMany({
       where: { user_id: userId },
       select: { apprenticeship_id: true, status: true }
     });
 
-    // 3. Map them together
-    // This creates a list where every apprenticeship has a 'has_applied' flag
-    return allPositions.map((pos) => {
+    // 3. Merge in memory
+    return allPositions.map((pos: any) => {
       const app = userApplications.find(a => a.apprenticeship_id === pos.apprenticeship_id);
       return {
         ...pos,

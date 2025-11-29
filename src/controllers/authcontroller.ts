@@ -12,6 +12,7 @@ import {
   EmailNotVerifiedError,
   PhoneNotVerifiedError
 } from "../utils/errors";
+import redisClient from "../utils/redisClient";
 
 class AuthController {
 static signup = async (req: Request, res: Response) => {
@@ -130,15 +131,27 @@ static signup = async (req: Request, res: Response) => {
   };
 
   static getMe = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const jwtPayload = req.user as { userId: number };
-      if (!jwtPayload?.userId) return res.status(401).json({ message: "Invalid token" });
-      const user = await AuthService.findUserById(jwtPayload.userId);
-      if (!user) return res.status(404).json({ message: "User not found" });
-      res.status(200).json(user);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server Error" });
+  try {
+    const jwtPayload = req.user as { userId: number };
+    const cacheKey = `user:profile:${jwtPayload.userId}`;
+
+    // 1. Check Redis
+    const cachedUser = await redisClient.get(cacheKey);
+    if (cachedUser) {
+      return res.status(200).json(JSON.parse(cachedUser));
     }
-  };
+
+    // 2. Fetch from DB
+    const user = await AuthService.findUserById(jwtPayload.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // 3. Cache it (e.g., for 10 minutes)
+    await redisClient.setEx(cacheKey, 600, JSON.stringify(user));
+
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server Error" });
+  }
+};
 }
 export default AuthController;

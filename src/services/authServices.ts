@@ -12,6 +12,7 @@ import {
   TokenExpiredError,
   BadRequestError,
 } from "../utils/errors";
+import redisClient from "../utils/redisClient";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
@@ -150,6 +151,16 @@ class AuthService {
       JWT_SECRET,
       { expiresIn: "1h" }
     );
+
+    // We store minimal data needed for middleware checks
+    const sessionData = JSON.stringify({
+      isActive: true,
+      role: user.role
+    });
+
+    // Set key "session:<userId>" with a 1-hour expiration (3600s)
+    await redisClient.setEx(`session:${user.user_id}`, 3600, sessionData);
+    
     return token;
   };
 
