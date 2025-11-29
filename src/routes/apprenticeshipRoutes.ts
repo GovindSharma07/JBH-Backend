@@ -18,5 +18,7 @@ router.post("/apprenticeships/apply", AuthMiddleware.authenticate, Apprenticeshi
 // Admin: Create & View All Data
 router.post("/apprenticeships", AuthMiddleware.authenticate, ApprenticeshipController.create);
 router.get("/admin/applications", AuthMiddleware.authenticate, ApprenticeshipController.getAdminApplications);
+router.post("/apprenticeships/upload-url", AuthMiddleware.authenticate, ApprenticeshipController.getUploadUrl);
+
 
 export default router;

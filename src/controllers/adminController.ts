@@ -1,0 +1,96 @@
+import { Response } from "express";
+import { PrismaClient } from "../generated/prisma/client";
+import { AuthenticatedRequest } from "../utils/types";
+import { BadRequestError, UserNotFoundError } from "../utils/errors";
+import bcrypt from "bcryptjs";
+
+const prisma = new PrismaClient();
+
+class AdminController {
+  
+  // 1. Get All Users
+  static getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Security check (Double check role even if middleware does it)
+      const userPayload = req.user as { role: string };
+      if (userPayload.role !== 'admin') return res.status(403).json({ message: "Admins only." });
+
+      const users = await prisma.users.findMany({
+        select: {
+          user_id: true,
+          full_name: true,
+          email: true,
+          phone: true,
+          role: true,
+          is_email_verified: true,
+          created_at: true
+        },
+        orderBy: { created_at: 'desc' }
+      });
+
+      return res.status(200).json(users);
+    } catch (error) {
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  };
+
+  // 2. Create New User (Admin/Instructor) manually
+  static createUser = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { full_name, email, password, phone, role } = req.body;
+      
+      // Validate input
+      if (!email || !password || !role) {
+        throw new BadRequestError("Email, password and role are required.");
+      }
+
+      // Check if user exists
+      const existing = await prisma.users.findUnique({ where: { email } });
+      if (existing) {
+        throw new BadRequestError("User already exists.");
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const newUser = await prisma.users.create({
+        data: {
+          full_name,
+          email,
+          password_hash: hashedPassword,
+          phone,
+          role: role, // 'admin', 'instructor', 'student'
+          is_email_verified: true, // Auto-verify manually created accounts
+          is_phone_verified: true 
+        }
+      });
+
+      return res.status(201).json({ message: "User created successfully", userId: newUser.user_id });
+
+    } catch (error) {
+      if (error instanceof BadRequestError) return res.status(400).json({ message: error.message });
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  };
+
+  // 3. Delete User
+  static deleteUser = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      await prisma.users.delete({ where: { user_id: Number(id) } });
+      return res.status(200).json({ message: "User deleted successfully" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to delete user" });
+    }
+  };
+
+  // 4. Block User (Toggle role to 'blocked' or similar logic if schema supports it)
+  // For now, we can just change password to a random string to lockout, 
+  // or if you update schema to have is_active, use that. 
+  // Let's assume we just don't have a 'blocked' state yet, so we skip or implement a basic lockout.
+  static blockUser = async (req: AuthenticatedRequest, res: Response) => {
+      // Placeholder: In a real app, add 'is_active' to your Prisma schema
+      return res.status(501).json({ message: "Block feature requires schema update (add is_active field)" });
+  };
+}
+
+export default AdminController;

@@ -4,6 +4,7 @@ import { Request, Response } from "express";
 import ApprenticeshipService from "../services/apprenticeshipService";
 import { AuthenticatedRequest } from "../utils/types";
 import { ApiError, BadRequestError } from "../utils/errors";
+import { generatePresignedUploadUrl } from "../utils/storage";
 
 class ApprenticeshipController {
   
@@ -101,6 +102,27 @@ class ApprenticeshipController {
         return res.status(500).json({ message: "Internal Server Error" });
     }
   }
+
+  static getUploadUrl = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userPayload = req.user as { role: string };
+      if (userPayload.role !== 'admin') {
+        return res.status(403).json({ message: "Admins only." });
+      }
+
+      const { fileName, fileType } = req.body;
+      if (!fileName || !fileType) {
+        throw new BadRequestError("File name and type required");
+      }
+
+      // Save to 'jobs' folder
+      const data = await generatePresignedUploadUrl(fileName, fileType, 'jobs');
+      return res.status(200).json(data);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Could not generate upload URL" });
+    }
+  };
 }
 
 export default ApprenticeshipController;
