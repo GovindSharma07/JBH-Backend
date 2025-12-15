@@ -19,9 +19,11 @@ class LessonService {
     });
     if (!moduleExists) throw new BadRequestError("Module not found");
 
-    const count = await prisma.lessons.count({
-      where: { module_id: data.moduleId }
+    const lastLesson = await prisma.lessons.findFirst({
+      where: { module_id: data.moduleId },
+      orderBy: { lesson_order: 'desc' }
     });
+    const newOrder = (lastLesson?.lesson_order ?? 0) + 1;
 
     const lesson = await prisma.lessons.create({
       data: {
@@ -32,7 +34,7 @@ class LessonService {
         // FIX: Convert undefined to null
         duration: data.duration ?? null, 
         is_free: data.isFree ?? false,
-        lesson_order: count + 1
+        lesson_order: newOrder
       }
     });
 

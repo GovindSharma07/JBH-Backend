@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 // Schedule task to run every hour (0 * * * *)
 export const startCleanupJob = () => {
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('0 3 * * *', async () => {
     console.log('🧹 Running cleanup job for expired tokens...');
     
     try {
