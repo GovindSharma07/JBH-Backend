@@ -9,6 +9,7 @@ import ResumeRoutes from './routes/resumeRoutes'; // <--- Import Resume Routes
 import AdminRoutes from './routes/adminRoutes';
 import { startCleanupJob } from './jobs/cleanup';
 import CourseRoutes from './routes/courseRoutes';
+import PaymentRoutes from './routes/paymentRoutes';
 
 const app = express();
 app.use(cors({origin: ['http://localhost:3000']})); // Allow Flutter web or specific origin
@@ -22,6 +23,7 @@ app.use('/api', ApprenticeshipRoutes); // <--- Register this
 app.use('/api', ResumeRoutes); // <--- Register Resume Routes
 app.use('/api',AdminRoutes);
 app.use('/api',CourseRoutes);
+app.use('/api', PaymentRoutes);
 
 // To start the server
 const port = process.env.PORT || 3000;

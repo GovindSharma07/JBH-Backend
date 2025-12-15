@@ -83,6 +83,64 @@ class CourseController {
       return res.status(500).json({ message: "Error fetching your courses" });
     }
   };
+
+  // Admin: Update Course
+  static update = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params;
+      const updatedCourse = await CourseService.updateCourse(Number(id), req.body);
+      return res.status(200).json(updatedCourse);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update course" });
+    }
+  };
+
+  // Admin: Delete Course
+  static delete = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params;
+      await CourseService.deleteCourse(Number(id));
+      return res.status(200).json({ message: "Course deleted successfully" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to delete course" });
+    }
+  };
+
+  // Admin: Update Module
+  static updateModule = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params; // Module ID
+      const { title, order } = req.body;
+
+      const module = await CourseService.updateModule(Number(id), title, order);
+      return res.status(200).json(module);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update module" });
+    }
+  };
+
+  // Admin: Delete Module
+  static deleteModule = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params; // Module ID
+      await CourseService.deleteModule(Number(id));
+      return res.status(200).json({ message: "Module deleted" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to delete module" });
+    }
+  };
 }
 
 export default CourseController;

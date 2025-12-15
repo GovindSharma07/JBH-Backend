@@ -64,6 +64,29 @@ class LessonService {
 
     return lesson;
   }
+
+  static async updateLesson(lessonId: number, data: any) {
+    const updateData: any = {};
+    // Only include fields that are actually present in the request
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.contentUrl !== undefined) updateData.content_url = data.contentUrl;
+    if (data.contentType !== undefined) updateData.content_type = data.contentType;
+    // Handle nullable duration specifically
+    if (data.duration !== undefined) updateData.duration = data.duration ?? null;
+    if (data.isFree !== undefined) updateData.is_free = data.isFree;
+    if (data.order !== undefined) updateData.lesson_order = data.order;
+
+    return await prisma.lessons.update({
+      where: { lesson_id: lessonId },
+      data: updateData
+    });
+  }
+
+  static async deleteLesson(lessonId: number) {
+    return await prisma.lessons.delete({
+      where: { lesson_id: lessonId }
+    });
+  }
 }
 
 export default LessonService;

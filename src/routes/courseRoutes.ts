@@ -1,6 +1,7 @@
+// src/routes/courseRoutes.ts
 import { Router } from "express";
 import CourseController from "../controllers/courseController";
-import LessonController from "../controllers/lessonController"; // <-- Import
+import LessonController from "../controllers/lessonController"; 
 import AuthMiddleware from "../middlewares/authMiddleware";
 
 const router = Router();
@@ -16,9 +17,20 @@ router.get("/my-courses", AuthMiddleware.authenticate, CourseController.getMyCou
 // --- Lesson Access ---
 router.get("/lessons/:id", AuthMiddleware.authenticate, LessonController.getOne);
 
-// --- Admin Only (Content Creation) ---
+// --- Admin Only (Content Management) ---
+// 1. Courses
 router.post("/courses", AuthMiddleware.authenticate, CourseController.create);
+router.put("/courses/:id", AuthMiddleware.authenticate, CourseController.update);   // <--- NEW
+router.delete("/courses/:id", AuthMiddleware.authenticate, CourseController.delete); // <--- NEW
+
+// 2. Modules
 router.post("/courses/:id/modules", AuthMiddleware.authenticate, CourseController.addModule);
-router.post("/lessons", AuthMiddleware.authenticate, LessonController.create); // <-- Add Lesson
+router.put("/modules/:id", AuthMiddleware.authenticate, CourseController.updateModule);    // <--- NEW
+router.delete("/modules/:id", AuthMiddleware.authenticate, CourseController.deleteModule); // <--- NEW
+
+// 3. Lessons
+router.post("/lessons", AuthMiddleware.authenticate, LessonController.create);
+router.put("/lessons/:id", AuthMiddleware.authenticate, LessonController.update);    // <--- NEW
+router.delete("/lessons/:id", AuthMiddleware.authenticate, LessonController.delete); // <--- NEW
 
 export default router;

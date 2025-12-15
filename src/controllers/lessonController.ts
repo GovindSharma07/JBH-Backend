@@ -48,6 +48,34 @@ class LessonController {
       return res.status(500).json({ message: "Error fetching lesson" });
     }
   };
+
+  // Admin: Update Lesson
+  static update = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params;
+      const lesson = await LessonService.updateLesson(Number(id), req.body);
+      return res.status(200).json(lesson);
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update lesson" });
+    }
+  };
+
+  // Admin: Delete Lesson
+  static delete = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params;
+      await LessonService.deleteLesson(Number(id));
+      return res.status(200).json({ message: "Lesson deleted" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to delete lesson" });
+    }
+  };
 }
 
 export default LessonController;

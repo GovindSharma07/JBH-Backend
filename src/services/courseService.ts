@@ -1,25 +1,21 @@
+// src/services/courseService.ts
 import { PrismaClient } from "../generated/prisma/client";
 import redisClient from "../utils/redisClient";
 import { BadRequestError } from "../utils/errors";
 
 const prisma = new PrismaClient();
-const CACHE_TTL = 3600; // Cache lives for 1 hour
+const CACHE_KEY = "courses:all_summary"; // Centralize key
 
 class CourseService {
   
-  // 1. Get All Courses (Optimized for Feed)
+  // ... (Keep existing getAllCourses, getCourseById, createCourse) ...
+  // Keep your existing methods here, I am adding the NEW ones below:
+
   static async getAllCourses() {
-    const cacheKey = "courses:all_summary";
+    // ... existing logic ...
+    const cachedData = await redisClient.get(CACHE_KEY);
+    if (cachedData) return JSON.parse(cachedData);
 
-    // A. Performance: Check Redis Cache first
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
-      console.log("⚡ Fetching courses from Redis Cache");
-      return JSON.parse(cachedData);
-    }
-
-    // B. Database Fallback (Lean Query)
-    // We strictly select ONLY what is needed for the list card (No description/syllabus)
     const courses = await prisma.courses.findMany({
       select: {
         course_id: true,
@@ -31,33 +27,23 @@ class CourseService {
       orderBy: { created_at: 'desc' }
     });
 
-    // C. Save to Redis for next time
-    await redisClient.setEx(cacheKey, CACHE_TTL, JSON.stringify(courses));
-    
+    await redisClient.setEx(CACHE_KEY, 3600, JSON.stringify(courses));
     return courses;
   }
 
-  // 2. Get Single Course (Full Details with Syllabus)
   static async getCourseById(courseId: number) {
-    const course = await prisma.courses.findUnique({
+     // ... existing logic ...
+     return prisma.courses.findUnique({
       where: { course_id: courseId },
       include: {
         modules: {
-          orderBy: { module_order: 'asc' }, // Keep chapters in order (1, 2, 3...)
-          include: {
-            lessons: {
-              orderBy: { lesson_id: 'asc' } // Keep lessons in order
-            }
-          }
+          orderBy: { module_order: 'asc' },
+          include: { lessons: { orderBy: { lesson_id: 'asc' } } }
         }
       }
     });
-
-    if (!course) throw new BadRequestError("Course not found");
-    return course;
   }
 
-  // 3. Create Course (Admin)
   static async createCourse(data: any) {
     const course = await prisma.courses.create({
       data: {
@@ -67,23 +53,67 @@ class CourseService {
         thumbnail_url: data.thumbnail_url,
       }
     });
-
-    // IMPORTANT: Invalidate cache so the new course appears immediately
-    await redisClient.del("courses:all_summary");
-    
+    await redisClient.del(CACHE_KEY); // Invalidate Cache
     return course;
   }
 
-  // 4. Add Module to Course (Admin)
-  static async addModule(courseId: number, title: string, order: number) {
-    return await prisma.syllabus_modules.create({
+  // --- NEW METHODS START ---
+
+  // Update Course
+  static async updateCourse(id: number, data: any) {
+    const course = await prisma.courses.update({
+      where: { course_id: id },
       data: {
-        course_id: courseId,
-        title: title,
-        module_order: order
+        title: data.title,
+        description: data.description,
+        price: data.price,
+        thumbnail_url: data.thumbnail_url,
       }
     });
+    await redisClient.del(CACHE_KEY); // Invalidate Cache
+    return course;
   }
+
+  // Delete Course
+  static async deleteCourse(id: number) {
+    // Prisma cascade will handle modules/lessons if configured, 
+    // but explicit delete is safer for cache clearing logic
+    await prisma.courses.delete({ where: { course_id: id } });
+    await redisClient.del(CACHE_KEY); // Invalidate Cache
+    return true;
+  }
+
+  // --- MODULES ---
+
+  // Add Module (Existing)
+  static async addModule(courseId: number, title: string, order: number) {
+    return await prisma.syllabus_modules.create({
+      data: { course_id: courseId, title: title, module_order: order }
+    });
+  }
+
+  // Update Module
+  static async updateModule(moduleId: number, title: string, order?: number) {
+    // Dynamically build object to avoid undefined issues
+    const updateData: any = { title };
+    if (order !== undefined) {
+      updateData.module_order = order;
+    }
+
+    return await prisma.syllabus_modules.update({
+      where: { module_id: moduleId },
+      data: updateData
+    });
+  }
+
+  // Delete Module
+  static async deleteModule(moduleId: number) {
+    return await prisma.syllabus_modules.delete({
+      where: { module_id: moduleId }
+    });
+  }
+
+  // --- NEW METHODS END ---
 }
 
 export default CourseService;
