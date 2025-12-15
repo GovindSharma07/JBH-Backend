@@ -47,6 +47,9 @@ model users {
   resumes  resumes[]
   apprenticeship_applications apprenticeship_applications[]
 
+  enrollments                 enrollments[]
+  payments                    payments[]
+
 }
 
 model verification_tokens {
@@ -95,4 +98,76 @@ model apprenticeship_applications {
   // Relations
   user              users           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   apprenticeship    apprenticeships @relation(fields: [apprenticeship_id], references: [apprenticeship_id], onDelete: Cascade)
+}
+
+model courses {
+  course_id     Int      @id @default(autoincrement())
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  thumbnail_url String?  @db.VarChar(500)
+  price         Decimal  @default(0.00) @db.Decimal(10, 2)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Performance: Index for fast sorting and filtering by price
+  @@index([created_at])
+  @@index([price])
+
+  // Relations
+  modules       syllabus_modules[]
+  enrollments   enrollments[]
+  payments      payments[]
+}
+
+model syllabus_modules {
+  module_id    Int      @id @default(autoincrement())
+  course_id    Int
+  title        String   @db.VarChar(255)
+  module_order Int      @default(0) // To keep chapters in order (1, 2, 3...)
+
+  course       courses  @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+  lessons      lessons[]
+  
+  @@index([course_id]) // Speed up fetching syllabus
+}
+
+model lessons {
+  lesson_id    Int      @id @default(autoincrement())
+  module_id    Int
+  title        String   @db.VarChar(255)
+  content_url  String   @db.VarChar(500) // Video URL or PDF Link
+  content_type String   @default("video") // 'video', 'pdf', 'quiz'
+  duration     Int?     // In minutes
+  is_free      Boolean  @default(false) // For "Demo Class" functionality
+  lesson_order Int      @default(0) // To keep lessons in order within module
+  module       syllabus_modules @relation(fields: [module_id], references: [module_id], onDelete: Cascade)
+  
+  @@index([module_id])
+}
+
+model enrollments {
+  enrollment_id     Int      @id @default(autoincrement())
+  user_id           Int
+  course_id         Int
+  enrollment_date   DateTime @default(now())
+  completion_status String   @default("in_progress") 
+
+  user    users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  course  courses @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+
+  @@unique([user_id, course_id]) // Prevent buying same course twice
+  @@index([user_id]) // Fast lookup of "My Courses"
+}
+
+model payments {
+  payment_id       Int      @id @default(autoincrement())
+  user_id          Int
+  course_id        Int
+  amount           Decimal  @db.Decimal(10, 2)
+  status           String   @default("pending") 
+  payment_gateway_id String? 
+  created_at       DateTime @default(now())
+
+  user    users   @relation(fields: [user_id], references: [user_id])
+  course  courses @relation(fields: [course_id], references: [course_id])
 }
