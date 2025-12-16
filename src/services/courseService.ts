@@ -4,7 +4,8 @@ import redisClient from "../utils/redisClient";
 import { BadRequestError } from "../utils/errors";
 
 const prisma = new PrismaClient();
-const CACHE_KEY = "courses:all_summary"; // Centralize key
+const CACHE_KEY_ALL = "courses:all_summary";     // Key for Admins (contains drafts)
+const CACHE_KEY_PUBLIC = "courses:public_summary"; // Key for Students (published only)
 
 class CourseService {
   
@@ -12,12 +13,15 @@ class CourseService {
   // Keep your existing methods here, I am adding the NEW ones below:
 
   static async getAllCourses(isAdmin: boolean = false) {
-    // ... existing logic ...
-    const cachedData = await redisClient.get(CACHE_KEY);
-    if (cachedData) return JSON.parse(cachedData);
+    // 1. Determine which Cache Key to use
+    const cacheKey = isAdmin ? CACHE_KEY_ALL : CACHE_KEY_PUBLIC;
 
+    const cachedData = await redisClient.get(cacheKey);
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
 
-    const whereClause = isAdmin ? {} : { is_published: true }; // Filter for students
+    const whereClause = isAdmin ? {} : { is_published: true };
 
     const courses = await prisma.courses.findMany({
       where: whereClause,
@@ -33,7 +37,9 @@ class CourseService {
       orderBy: { created_at: 'desc' }
     });
 
-    await redisClient.setEx(CACHE_KEY, 3600, JSON.stringify(courses));
+    // 5. Cache the result (expire in 1 hour)
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(courses));
+    
     return courses;
   }
 
@@ -68,7 +74,7 @@ static async getCourseById(courseId: number) {
         thumbnail_url: data.thumbnail_url,
       }
     });
-    await redisClient.del(CACHE_KEY); // Invalidate Cache
+    await redisClient.del(CACHE_KEY_ALL); // Invalidate Cache
     return course;
   }
 
@@ -85,7 +91,7 @@ static async getCourseById(courseId: number) {
         thumbnail_url: data.thumbnail_url,
       }
     });
-    await redisClient.del(CACHE_KEY); // Invalidate Cache
+    await redisClient.del(CACHE_KEY_ALL); // Invalidate Cache
     return course;
   }
 
@@ -94,7 +100,7 @@ static async getCourseById(courseId: number) {
     // Prisma cascade will handle modules/lessons if configured, 
     // but explicit delete is safer for cache clearing logic
     await prisma.courses.delete({ where: { course_id: id } });
-    await redisClient.del(CACHE_KEY); // Invalidate Cache
+    await redisClient.del(CACHE_KEY_ALL); // Invalidate Cache
     return true;
   }
 

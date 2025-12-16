@@ -21,9 +21,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', AuthRoutes);
 app.use('/api', ApprenticeshipRoutes); // <--- Register this
 app.use('/api', ResumeRoutes); // <--- Register Resume Routes
-app.use('/api',AdminRoutes);
+
 app.use('/api',CourseRoutes);
 app.use('/api', PaymentRoutes);
+app.use('/api',AdminRoutes);
 
 // To start the server
 const port = process.env.PORT || 3000;

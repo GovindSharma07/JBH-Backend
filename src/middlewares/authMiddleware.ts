@@ -26,12 +26,7 @@ class AuthMiddleware {
       const cachedSession = await redisClient.get(sessionKey);
 
       if (!cachedSession) {
-        // EDGE CASE: Token is valid but Redis key expired or missing (e.g. server restart)
-        // Option A (Strict): Deny access (User must login again) -> Recommended for security
         return res.status(401).json({ message: "Session expired. Please login again." });
-
-        // Option B (Fail-safe): Fallback to Database check, then re-cache (Cache-Aside)
-        // See "Optimization" below if you want this.
       }
 
       // 3. Attach User to Request

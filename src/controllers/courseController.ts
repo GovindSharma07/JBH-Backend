@@ -14,9 +14,6 @@ class CourseController {
       const user = req.user as { role: string };
       const isAdmin = user.role === 'admin';
 
-      // 2. Pass isAdmin flag to the service
-      // Admin sees ALL courses (drafts + published)
-      // Students see ONLY published courses
       const courses = await CourseService.getAllCourses(isAdmin);
       
       return res.status(200).json(courses);
