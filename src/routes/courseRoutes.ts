@@ -7,7 +7,7 @@ import AuthMiddleware from "../middlewares/authMiddleware";
 const router = Router();
 
 // --- Public / General ---
-router.get("/courses", CourseController.getList);
+router.get("/courses",AuthMiddleware.authenticate, CourseController.getList);
 router.get("/courses/:id", CourseController.getDetail);
 
 // --- Student Actions ---
@@ -27,10 +27,12 @@ router.delete("/courses/:id", AuthMiddleware.authenticate, CourseController.dele
 router.post("/courses/:id/modules", AuthMiddleware.authenticate, CourseController.addModule);
 router.put("/modules/:id", AuthMiddleware.authenticate, CourseController.updateModule);    // <--- NEW
 router.delete("/modules/:id", AuthMiddleware.authenticate, CourseController.deleteModule); // <--- NEW
+router.put("/courses/:id/modules/reorder", AuthMiddleware.authenticate, CourseController.reorderModules); // <--- NEW
 
 // 3. Lessons
 router.post("/lessons", AuthMiddleware.authenticate, LessonController.create);
 router.put("/lessons/:id", AuthMiddleware.authenticate, LessonController.update);    // <--- NEW
 router.delete("/lessons/:id", AuthMiddleware.authenticate, LessonController.delete); // <--- NEW
+router.put("/modules/:id/lessons/reorder", AuthMiddleware.authenticate, LessonController.reorder); // <--- NEW
 
 export default router;

@@ -5,33 +5,41 @@ import { BadRequestError } from "../utils/errors";
 
 class LessonController {
   
-  // Admin: Add Lesson
-  static create = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const user = req.user as { role: string };
-      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+  // Admin: Create Lesson
 
-      const { moduleId, title, contentUrl, contentType, duration, isFree } = req.body;
-      
-      if (!moduleId || !title || !contentUrl) {
-        throw new BadRequestError("Module ID, Title, and Content URL are required");
-      }
+static create = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = req.user as { role: string };
+    if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
 
-      const lesson = await LessonService.addLesson({
-        moduleId: Number(moduleId),
-        title,
-        contentUrl,
-        contentType: contentType || 'video',
-        duration: duration ? Number(duration) : undefined,
-        isFree
-      });
+    const { moduleId, title, contentUrl, contentType, duration, isFree } = req.body;
 
-      return res.status(201).json(lesson);
-    } catch (error) {
-      if (error instanceof BadRequestError) return res.status(400).json({ message: error.message });
-      return res.status(500).json({ message: "Failed to add lesson" });
+    // --- NEW VALIDATION START ---
+    const validTypes = ['video', 'pdf'];
+    if (contentType && !validTypes.includes(contentType)) {
+      return res.status(400).json({ message: "Invalid content type. Must be 'video' or 'pdf'" });
     }
-  };
+    // --- NEW VALIDATION END ---
+
+    if (!moduleId || !title || !contentUrl) {
+      throw new BadRequestError("Module ID, Title, and Content URL are required");
+    }
+
+    const lesson = await LessonService.addLesson({
+      moduleId: Number(moduleId),
+      title,
+      contentUrl,
+      contentType: contentType || 'video',
+      duration: duration ? Number(duration) : undefined,
+      isFree
+    });
+
+    return res.status(201).json(lesson);
+  } catch (error) {
+    if (error instanceof BadRequestError) return res.status(400).json({ message: error.message });
+    return res.status(500).json({ message: "Failed to add lesson" });
+  }
+};
 
   // Student: View Lesson (Protected logic inside Service)
   static getOne = async (req: AuthenticatedRequest, res: Response) => {
@@ -74,6 +82,22 @@ class LessonController {
       return res.status(200).json({ message: "Lesson deleted" });
     } catch (error) {
       return res.status(500).json({ message: "Failed to delete lesson" });
+    }
+  };
+
+  // Admin: Reorder Lessons
+  static reorder = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params; // Module ID
+      const { updates } = req.body; // Array of { id, order }
+
+      await LessonService.reorderLessons(Number(id), updates);
+      return res.status(200).json({ message: "Lessons reordered" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to reorder lessons" });
     }
   };
 }

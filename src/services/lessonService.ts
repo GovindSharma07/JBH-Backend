@@ -89,6 +89,18 @@ class LessonService {
       where: { lesson_id: lessonId }
     });
   }
+
+  // NEW: Reorder Lessons
+  static async reorderLessons(moduleId: number, updates: { id: number; order: number }[]) {
+    return await prisma.$transaction(
+      updates.map((u) =>
+        prisma.lessons.update({
+          where: { lesson_id: u.id, module_id: moduleId },
+          data: { lesson_order: u.order },
+        })
+      )
+    );
+  }
 }
 
 export default LessonService;

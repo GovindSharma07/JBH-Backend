@@ -108,6 +108,7 @@ model courses {
   price         Decimal  @default(0.00) @db.Decimal(10, 2)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
+  is_published  Boolean  @default(false)
 
   // Performance: Index for fast sorting and filtering by price
   @@index([created_at])

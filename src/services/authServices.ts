@@ -149,7 +149,7 @@ class AuthService {
     const token = jwt.sign(
       { userId: user.user_id, role: user.role },
       JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "7d" }
     );
 
     // We store minimal data needed for middleware checks

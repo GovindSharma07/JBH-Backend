@@ -20,5 +20,6 @@ router.get("/admin/users", AdminController.getAllUsers);
 router.post("/admin/users", AdminController.createUser);
 router.delete("/admin/users/:id", AdminController.deleteUser);
 router.patch("/admin/users/:id/block", AdminController.blockUser);
+router.post("/admin/upload-url", AdminController.getUploadUrl);
 
 export default router;

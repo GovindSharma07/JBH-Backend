@@ -5,6 +5,7 @@ import { BadRequestError, UserNotFoundError } from "../utils/errors";
 import bcrypt from "bcryptjs";
 import redisClient from "../utils/redisClient";
 import { validateEmail, validatePassword } from "../utils/validation";
+import { generatePresignedUploadUrl } from "../utils/storage";
 
 const prisma = new PrismaClient();
 
@@ -107,6 +108,31 @@ class AdminController {
   static blockUser = async (req: AuthenticatedRequest, res: Response) => {
       // Placeholder: In a real app, add 'is_active' to your Prisma schema
       return res.status(501).json({ message: "Block feature requires schema update (add is_active field)" });
+  };
+
+  static getUploadUrl = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { fileName, fileType, folder } = req.body;
+      
+      if (!fileName || !fileType) {
+        throw new BadRequestError("File name and type are required");
+      }
+
+      // 1. Security: Whitelist allowed folders
+      const allowedFolders = ['courses', 'lessons', 'resumes', 'avatars'];
+      let targetFolder = folder || 'courses';
+
+      if (!allowedFolders.includes(targetFolder)) {
+        return res.status(400).json({ message: "Invalid upload folder" });
+      }
+
+      // 2. Generate URL
+      const data = await generatePresignedUploadUrl(fileName, fileType, targetFolder);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.error("Upload URL Error:", error);
+      return res.status(500).json({ message: "Could not generate upload URL" });
+    }
   };
 }
 

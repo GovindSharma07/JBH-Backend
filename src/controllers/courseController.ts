@@ -7,9 +7,18 @@ import EnrollmentService from "../services/enrollmentService";
 class CourseController {
   
   // Public: Get all courses
+ // Public: Get all courses
   static getList = async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const courses = await CourseService.getAllCourses();
+      // 1. Get user from the request (guaranteed to exist now)
+      const user = req.user as { role: string };
+      const isAdmin = user.role === 'admin';
+
+      // 2. Pass isAdmin flag to the service
+      // Admin sees ALL courses (drafts + published)
+      // Students see ONLY published courses
+      const courses = await CourseService.getAllCourses(isAdmin);
+      
       return res.status(200).json(courses);
     } catch (error) {
       console.error(error);
@@ -139,6 +148,22 @@ class CourseController {
       return res.status(200).json({ message: "Module deleted" });
     } catch (error) {
       return res.status(500).json({ message: "Failed to delete module" });
+    }
+  };
+
+  // Admin: Reorder Modules
+  static reorderModules = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params; // Course ID
+      const { updates } = req.body; // Array of { id, order }
+
+      await CourseService.reorderModules(Number(id), updates);
+      return res.status(200).json({ message: "Modules reordered" });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to reorder modules" });
     }
   };
 }

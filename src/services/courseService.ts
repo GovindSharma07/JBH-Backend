@@ -11,18 +11,24 @@ class CourseService {
   // ... (Keep existing getAllCourses, getCourseById, createCourse) ...
   // Keep your existing methods here, I am adding the NEW ones below:
 
-  static async getAllCourses() {
+  static async getAllCourses(isAdmin: boolean = false) {
     // ... existing logic ...
     const cachedData = await redisClient.get(CACHE_KEY);
     if (cachedData) return JSON.parse(cachedData);
 
+
+    const whereClause = isAdmin ? {} : { is_published: true }; // Filter for students
+
     const courses = await prisma.courses.findMany({
+      where: whereClause,
       select: {
         course_id: true,
         title: true,
+        description: true,
         thumbnail_url: true,
         price: true,
-        created_at: true
+        created_at: true,
+        is_published: true
       },
       orderBy: { created_at: 'desc' }
     });
@@ -31,17 +37,26 @@ class CourseService {
     return courses;
   }
 
-  static async getCourseById(courseId: number) {
-     // ... existing logic ...
-     return prisma.courses.findUnique({
-      where: { course_id: courseId },
-      include: {
-        modules: {
-          orderBy: { module_order: 'asc' },
-          include: { lessons: { orderBy: { lesson_id: 'asc' } } }
+static async getCourseById(courseId: number) {
+  return prisma.courses.findUnique({
+    where: { course_id: courseId },
+    include: {
+      modules: {
+        orderBy: [
+          { module_order: 'asc' }, 
+          { module_id: 'asc' } // Tie-breaker for modules
+        ], 
+        include: { 
+          lessons: { 
+            orderBy: [
+              { lesson_order: 'asc' }, // Primary sort
+              { lesson_id: 'asc' }     // Secondary sort (Fixes the 0,0,0 issue)
+            ]
+          } 
         }
       }
-    });
+    }
+  });
   }
 
   static async createCourse(data: any) {
@@ -114,6 +129,19 @@ class CourseService {
   }
 
   // --- NEW METHODS END ---
+
+  // NEW: Reorder Modules
+  static async reorderModules(courseId: number, updates: { id: number; order: number }[]) {
+    // Use a transaction to update all at once
+    return await prisma.$transaction(
+      updates.map((u) =>
+        prisma.syllabus_modules.update({
+          where: { module_id: u.id, course_id: courseId }, // Ensure courseId matches for security
+          data: { module_order: u.order },
+        })
+      )
+    );
+  }
 }
 
 export default CourseService;
