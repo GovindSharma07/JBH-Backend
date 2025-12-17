@@ -22,4 +22,7 @@ router.delete("/admin/users/:id", AdminController.deleteUser);
 router.patch("/admin/users/:id/block", AdminController.blockUser);
 router.post("/admin/upload-url", AdminController.getUploadUrl);
 
+router.post("/admin/timetable", AdminController.createScheduleSlot);
+router.delete("/admin/timetable/:id", AdminController.deleteScheduleSlot);
+
 export default router;

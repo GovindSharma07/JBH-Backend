@@ -11,12 +11,16 @@ import { startCleanupJob } from './jobs/cleanup';
 import CourseRoutes from './routes/courseRoutes';
 import PaymentRoutes from './routes/paymentRoutes';
 import lmsRoutes from './routes/lmsRoutes';
+import { videoSdkWebhook } from './controllers/webhookController';
 
 const app = express();
 app.use(cors({origin: ['http://localhost:3000']})); // Allow Flutter web or specific origin
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// WEBHOOK ROUTE (Public)
+app.post('/api/webhooks/videosdk', videoSdkWebhook);
 
 // Register Routes
 app.use('/api', AuthRoutes);

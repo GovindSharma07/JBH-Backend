@@ -1,5 +1,5 @@
 import { PrismaClient } from "../generated/prisma/client";
-import { BadRequestError } from "../utils/errors";
+import { AppError, BadRequestError } from "../utils/errors";
 
 const prisma = new PrismaClient();
 
@@ -100,6 +100,26 @@ class LessonService {
         })
       )
     );
+  }
+
+  // NEW: Fetch detailed lesson info (Recording or Live)
+  static async getLessonDetails(lessonId: number) {
+    const lesson = await prisma.lessons.findUnique({
+      where: { lesson_id: lessonId },
+      include: {
+        live_lecture: {
+          select: {
+            status: true,
+            start_time: true,
+            room_id: true,
+            meeting_url: true
+          }
+        }
+      }
+    });
+
+    if (!lesson) throw new AppError("Lesson not found", 404);
+    return lesson;
   }
 }
 

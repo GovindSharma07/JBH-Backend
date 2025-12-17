@@ -17,6 +17,11 @@ router.get(
     LMSController.joinClass
 );
 
+router.get(
+    '/student/lesson/:lessonId',
+    authenticateUser,
+    LMSController.getLessonDetails // Make sure to export this in lmsController
+);
 
 // --- INSTRUCTOR ROUTES ---
 router.get(
