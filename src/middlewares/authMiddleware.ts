@@ -1,15 +1,14 @@
 import { Response, NextFunction } from "express";
 import { verifyToken } from "../utils/jwt";
-import { AuthenticatedRequest } from "../utils/types"; // Fixed typo
+import { AuthenticatedRequest } from "../utils/types";
 import redisClient from "../utils/redisClient";
 
 class AuthMiddleware {
   static authenticate = async (
-    req: AuthenticatedRequest, // Fixed typo
+    req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
   ) => {
-    // Add space after Bearer
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
@@ -18,10 +17,10 @@ class AuthMiddleware {
       });
     }
     try {
-      // 1. Verify Signature (CPU operation, very fast)
+      // 1. Verify Signature
       const decode = verifyToken(token) as { userId: number; role: string };
 
-      // 2. NEW: Check Redis Cache (Fast I/O)
+      // 2. Check Redis Cache
       const sessionKey = `session:${decode.userId}`;
       const cachedSession = await redisClient.get(sessionKey);
 
@@ -40,5 +39,33 @@ class AuthMiddleware {
     }
   };
 }
+
+// --- EXPORTS FOR LMS ROUTES ---
+
+// 1. Export 'authenticateUser' (Alias for existing logic)
+export const authenticateUser = AuthMiddleware.authenticate;
+
+// 2. Export 'authorizeRoles' (Fixed Type Casting)
+export const authorizeRoles = (...allowedRoles: string[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    // 1. Safety Check: Ensure user exists
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // 2. Explicitly Cast User to the expected type
+    // This tells TypeScript: "Trust me, req.user has a role property"
+    const user = req.user as { userId: number; role: string };
+
+    // 3. Check Role
+    if (!allowedRoles.includes(user.role)) {
+      return res.status(403).json({ 
+        message: "Forbidden: You do not have permission to access this resource" 
+      });
+    }
+
+    next();
+  };
+};
 
 export default AuthMiddleware;

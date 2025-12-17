@@ -1,7 +1,7 @@
 // src/services/apprenticeshipService.ts
 
 import { PrismaClient } from "../generated/prisma/client";
-import { ApiError, BadRequestError } from "../utils/errors";
+import { AppError, BadRequestError } from "../utils/errors";
 import redisClient from "../utils/redisClient";
 import ResumeService from "./resumeService";
 
@@ -81,7 +81,7 @@ class ApprenticeshipService {
     const item = await prisma.apprenticeships.findUnique({
       where: { apprenticeship_id: id },
     });
-    if (!item) throw new ApiError("Apprenticeship not found", 404);
+    if (!item) throw new AppError("Apprenticeship not found", 404);
     return item;
   }
 

@@ -10,6 +10,7 @@ import AdminRoutes from './routes/adminRoutes';
 import { startCleanupJob } from './jobs/cleanup';
 import CourseRoutes from './routes/courseRoutes';
 import PaymentRoutes from './routes/paymentRoutes';
+import lmsRoutes from './routes/lmsRoutes';
 
 const app = express();
 app.use(cors({origin: ['http://localhost:3000']})); // Allow Flutter web or specific origin
@@ -21,7 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', AuthRoutes);
 app.use('/api', ApprenticeshipRoutes); // <--- Register this
 app.use('/api', ResumeRoutes); // <--- Register Resume Routes
-
+app.use('/api/lms', lmsRoutes);
 app.use('/api',CourseRoutes);
 app.use('/api', PaymentRoutes);
 app.use('/api',AdminRoutes);

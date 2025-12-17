@@ -3,7 +3,7 @@
 import { Request, Response } from "express";
 import ApprenticeshipService from "../services/apprenticeshipService";
 import { AuthenticatedRequest } from "../utils/types";
-import { ApiError, BadRequestError } from "../utils/errors";
+import { AppError, BadRequestError } from "../utils/errors";
 import { generatePresignedUploadUrl } from "../utils/storage";
 
 class ApprenticeshipController {
@@ -50,7 +50,7 @@ class ApprenticeshipController {
       const item = await ApprenticeshipService.getApprenticeshipById(Number(id));
       return res.status(200).json(item);
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal Server Error" });
     }
   };
@@ -81,7 +81,7 @@ class ApprenticeshipController {
       });
 
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       console.error(error);
       return res.status(500).json({ message: "Internal Server Error" });
     }

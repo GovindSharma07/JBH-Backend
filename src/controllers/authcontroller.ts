@@ -7,7 +7,7 @@ import {
   validatePhone,
 } from "../utils/validation";
 import {
-  ApiError,
+  AppError,
   BadRequestError,
   EmailNotVerifiedError,
   PhoneNotVerifiedError
@@ -62,7 +62,7 @@ static signup = async (req: Request, res: Response) => {
       }
       // ---------------------
 
-      if (error instanceof ApiError) {
+      if (error instanceof AppError) {
         return res.status(error.statusCode).json({ message: error.message });
       }
       console.error(error);
@@ -77,7 +77,7 @@ static signup = async (req: Request, res: Response) => {
       await AuthService.resendVerificationOtps(email);
       return res.status(200).json({ message: "Codes resent." });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -89,7 +89,7 @@ static signup = async (req: Request, res: Response) => {
       await AuthService.verifyEmail(email, code);
       return res.status(200).json({ message: "Email verified." });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -101,7 +101,7 @@ static signup = async (req: Request, res: Response) => {
       await AuthService.verifyPhone(email, code);
       return res.status(200).json({ message: "Phone verified." });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };
@@ -125,7 +125,7 @@ static signup = async (req: Request, res: Response) => {
       await AuthService.resetPassword(email, otp, newPassword);
       return res.status(200).json({ message: "Password reset successful." });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal server error" });
     }
   };

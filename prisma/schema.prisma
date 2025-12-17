@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -13,6 +7,9 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// --- ENUMS ---
+
 enum Role {
   student
   instructor
@@ -25,31 +22,55 @@ enum VerificationTokenPurpose {
   PHONE_VERIFICATION
 }
 
-enum ApplicationStatus{
+enum ApplicationStatus {
   pending
   reviewed
   accepted
   rejected
 }
 
+enum ContentType {
+  video
+  live
+  quiz
+  assignment
+  pdf
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  excused // Added 'excused' just in case
+}
+
+// --- USER & AUTH MODELS ---
+
 model users {
-  user_id       Int      @id @default(autoincrement())
-  full_name     String?
-  email         String   @unique
-  password_hash String
-  phone         String
-  role          String   @default("student")
-  created_at    DateTime @default(now())
-  is_email_verified Boolean @default(false)
-  is_phone_verified Boolean @default(false)
+  user_id             Int       @id @default(autoincrement())
+  full_name           String?
+  email               String    @unique
+  password_hash       String
+  phone               String
+  role                String    @default("student") // student, instructor, admin
+  created_at          DateTime  @default(now())
+  is_email_verified   Boolean   @default(false)
+  is_phone_verified   Boolean   @default(false)
+  
+  // Relations
   verification_tokens verification_tokens[]
-
-  resumes  resumes[]
+  resumes             resumes[]
   apprenticeship_applications apprenticeship_applications[]
+  enrollments         enrollments[]
+  payments            payments[]
+  attendance          attendance[]
+  quiz_submissions    quiz_submissions[]
+  assignment_submissions assignment_submissions[]
+  scholarship_applications scholarship_applications[]
 
-  enrollments                 enrollments[]
-  payments                    payments[]
-
+  // --- NEW: Instructor Relations ---
+  assigned_schedule   time_table[]    @relation("ScheduleInstructor")
+  live_classes_taught live_lectures[] @relation("ClassInstructor")
 }
 
 model verification_tokens {
@@ -64,12 +85,198 @@ model verification_tokens {
 model resumes {
   resume_id    Int      @id @default(autoincrement())
   user_id      Int
-  name         String   @db.VarChar(100) // e.g., "Frontend CV", "Backend CV"
-  file_url     String   @db.VarChar(500) // The Cloudflare/B2 URL
+  name         String   @db.VarChar(100)
+  file_url     String   @db.VarChar(500)
   uploaded_at  DateTime @default(now())
 
   user         users    @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
 }
+
+// --- COURSE & LMS MODELS ---
+
+model courses {
+  course_id     Int      @id @default(autoincrement())
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  thumbnail_url String?  @db.VarChar(500)
+  price         Decimal  @default(0.00) @db.Decimal(10, 2)
+  is_published  Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Relations
+  modules       syllabus_modules[]
+  enrollments   enrollments[]
+  payments      payments[]
+  time_table    time_table[]
+
+  @@index([created_at])
+  @@index([price])
+}
+
+model syllabus_modules {
+  module_id    Int      @id @default(autoincrement())
+  course_id    Int
+  title        String   @db.VarChar(255)
+  module_order Int      @default(0)
+
+  // Relations
+  course       courses       @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+  lessons      lessons[]
+  quizzes      quizzes[]
+  assignments  assignments[]
+  
+  // --- NEW: Link subjects to the time table ---
+  time_table   time_table[]
+
+  @@index([course_id])
+}
+
+model lessons {
+  lesson_id    Int      @id @default(autoincrement())
+  module_id    Int
+  title        String   @db.VarChar(255)
+  lesson_order Int      @default(0)
+  
+  // Content Type Flag
+  content_type ContentType @default(video)
+
+  // 1. Standard Content (PDFs / Direct Video Links)
+  content_url  String?  @db.VarChar(500) 
+  duration     Int?     // In minutes
+  is_free      Boolean  @default(false) // Demo Class
+
+  // 2. Polymorphic Relations (For Live Classes & Quizzes)
+  live_lecture      live_lectures?
+
+  module       syllabus_modules @relation(fields: [module_id], references: [module_id], onDelete: Cascade)
+  
+  @@index([module_id])
+}
+
+// --- LIVE CLASS & SCHEDULE ---
+
+model live_lectures {
+  live_lecture_id Int      @id @default(autoincrement())
+  lesson_id       Int      @unique // One-to-One with Lesson
+  
+  // VideoSDK Specific Fields
+  room_id         String   @db.VarChar(100) 
+  meeting_url     String?  @db.VarChar(500) 
+
+  start_time      DateTime
+  end_time        DateTime
+  status          String   @default("live") // live, completed
+
+  // --- NEW: Identify exactly who taught this class ---
+  instructor_id   Int?     
+  instructor      users?   @relation("ClassInstructor", fields: [instructor_id], references: [user_id])
+
+  // Relations
+  lesson          lessons      @relation(fields: [lesson_id], references: [lesson_id], onDelete: Cascade)
+  attendance      attendance[]
+}
+
+model time_table {
+  schedule_id     Int      @id @default(autoincrement())
+  course_id       Int
+  
+  // --- NEW: Multi-Instructor Logic ---
+  // We assign a specific instructor to a specific slot
+  instructor_id   Int
+  instructor      users    @relation("ScheduleInstructor", fields: [instructor_id], references: [user_id])
+
+  // Optional: Link to a specific Subject (Module)
+  module_id       Int?
+  module          syllabus_modules? @relation(fields: [module_id], references: [module_id])
+
+  // Recurring Schedule Logic
+  day_of_week     String   @db.VarChar(15) // "Monday", "Tuesday"
+  start_time      String   @db.VarChar(10) // "10:00 AM" 
+  end_time        String   @db.VarChar(10)
+  
+  course          courses        @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
+}
+
+model attendance {
+  attendance_id   Int      @id @default(autoincrement())
+  live_lecture_id Int
+  user_id         Int
+  status          AttendanceStatus @default(absent)
+  recorded_at     DateTime @default(now())
+
+  live_lecture    live_lectures @relation(fields: [live_lecture_id], references: [live_lecture_id])
+  user            users         @relation(fields: [user_id], references: [user_id])
+
+  @@unique([live_lecture_id, user_id]) 
+}
+
+// --- QUIZZES & ASSIGNMENTS ---
+
+model quizzes {
+  quiz_id    Int      @id @default(autoincrement())
+  module_id  Int
+  title      String   @db.VarChar(255)
+  
+  module     syllabus_modules @relation(fields: [module_id], references: [module_id])
+  questions  questions[]
+  submissions quiz_submissions[]
+}
+
+model questions {
+  question_id   Int    @id @default(autoincrement())
+  quiz_id       Int
+  question_text String @db.Text
+  question_type String @default("multiple_choice") // multiple_choice, true_false
+  
+  quiz          quizzes @relation(fields: [quiz_id], references: [quiz_id])
+  choices       question_choices[]
+}
+
+model question_choices {
+  choice_id   Int     @id @default(autoincrement())
+  question_id Int
+  choice_text String
+  is_correct  Boolean @default(false)
+
+  question    questions @relation(fields: [question_id], references: [question_id])
+}
+
+model quiz_submissions {
+  submission_id Int      @id @default(autoincrement())
+  quiz_id       Int
+  user_id       Int
+  score         Int
+  submitted_at  DateTime @default(now())
+
+  quiz          quizzes @relation(fields: [quiz_id], references: [quiz_id])
+  user          users   @relation(fields: [user_id], references: [user_id])
+}
+
+model assignments {
+  assignment_id Int      @id @default(autoincrement())
+  module_id     Int
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  due_date      DateTime
+  
+  module        syllabus_modules @relation(fields: [module_id], references: [module_id])
+  submissions   assignment_submissions[]
+}
+
+model assignment_submissions {
+  submission_id  Int      @id @default(autoincrement())
+  assignment_id  Int
+  user_id        Int
+  submission_url String   @db.VarChar(500) // File Link
+  grade          Int?
+  submitted_at   DateTime @default(now())
+
+  assignment     assignments @relation(fields: [assignment_id], references: [assignment_id])
+  user           users       @relation(fields: [user_id], references: [user_id])
+}
+
+// --- APPRENTICESHIPS & JOBS ---
 
 model apprenticeships {
   apprenticeship_id Int      @id @default(autoincrement())
@@ -78,9 +285,9 @@ model apprenticeships {
   title             String   @db.VarChar(255)
   description       String   @db.Text
   location          String   @db.VarChar(255)
-  duration          String?  @db.VarChar(100) // Added for frontend detail screen
+  duration          String?  @db.VarChar(100)
   stipend           Decimal  @db.Decimal(10, 2)
-  is_active         Boolean  @default(true)   // To filter "Open" positions
+  is_active         Boolean  @default(true)
   posted_at         DateTime @default(now())
 
   applications      apprenticeship_applications[]
@@ -90,61 +297,40 @@ model apprenticeship_applications {
   application_id    Int      @id @default(autoincrement())
   user_id           Int
   apprenticeship_id Int
-  status            ApplicationStatus   @default(pending)
-  resume_url        String  @db.VarChar(500) // For Resume Upload
-  message           String?  @db.Text         // For optional message
+  status            ApplicationStatus @default(pending)
+  resume_url        String   @db.VarChar(500)
+  message           String?  @db.Text
   submitted_at      DateTime @default(now())
 
-  // Relations
   user              users           @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   apprenticeship    apprenticeships @relation(fields: [apprenticeship_id], references: [apprenticeship_id], onDelete: Cascade)
 }
 
-model courses {
-  course_id     Int      @id @default(autoincrement())
-  title         String   @db.VarChar(255)
-  description   String?  @db.Text
-  thumbnail_url String?  @db.VarChar(500)
-  price         Decimal  @default(0.00) @db.Decimal(10, 2)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  is_published  Boolean  @default(false)
+// --- SCHOLARSHIPS ---
 
-  // Performance: Index for fast sorting and filtering by price
-  @@index([created_at])
-  @@index([price])
+model scholarships {
+  scholarship_id       Int      @id @default(autoincrement())
+  title                String   @db.VarChar(255)
+  description          String   @db.Text
+  eligibility_criteria String   @db.Text
+  amount               Decimal  @db.Decimal(10, 2)
+  deadline             DateTime?
 
-  // Relations
-  modules       syllabus_modules[]
-  enrollments   enrollments[]
-  payments      payments[]
+  applications         scholarship_applications[]
 }
 
-model syllabus_modules {
-  module_id    Int      @id @default(autoincrement())
-  course_id    Int
-  title        String   @db.VarChar(255)
-  module_order Int      @default(0) // To keep chapters in order (1, 2, 3...)
+model scholarship_applications {
+  application_id Int      @id @default(autoincrement())
+  user_id        Int
+  scholarship_id Int
+  status         String   @default("pending")
+  submitted_at   DateTime @default(now())
 
-  course       courses  @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
-  lessons      lessons[]
-  
-  @@index([course_id]) // Speed up fetching syllabus
+  user           users        @relation(fields: [user_id], references: [user_id])
+  scholarship    scholarships @relation(fields: [scholarship_id], references: [scholarship_id])
 }
 
-model lessons {
-  lesson_id    Int      @id @default(autoincrement())
-  module_id    Int
-  title        String   @db.VarChar(255)
-  content_url  String   @db.VarChar(500) // Video URL or PDF Link
-  content_type String   @default("video") // 'video', 'pdf', 'quiz'
-  duration     Int?     // In minutes
-  is_free      Boolean  @default(false) // For "Demo Class" functionality
-  lesson_order Int      @default(0) // To keep lessons in order within module
-  module       syllabus_modules @relation(fields: [module_id], references: [module_id], onDelete: Cascade)
-  
-  @@index([module_id])
-}
+// --- PAYMENTS & ENROLLMENTS ---
 
 model enrollments {
   enrollment_id     Int      @id @default(autoincrement())
@@ -156,18 +342,18 @@ model enrollments {
   user    users   @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   course  courses @relation(fields: [course_id], references: [course_id], onDelete: Cascade)
 
-  @@unique([user_id, course_id]) // Prevent buying same course twice
-  @@index([user_id]) // Fast lookup of "My Courses"
+  @@unique([user_id, course_id])
+  @@index([user_id])
 }
 
 model payments {
-  payment_id       Int      @id @default(autoincrement())
-  user_id          Int
-  course_id        Int
-  amount           Decimal  @db.Decimal(10, 2)
-  status           String   @default("pending") 
-  payment_gateway_id String? 
-  created_at       DateTime @default(now())
+  payment_id         Int      @id @default(autoincrement())
+  user_id            Int
+  course_id          Int
+  amount             Decimal  @db.Decimal(10, 2)
+  status             String   @default("pending") 
+  payment_gateway_id String?
+  created_at         DateTime @default(now())
 
   user    users   @relation(fields: [user_id], references: [user_id])
   course  courses @relation(fields: [course_id], references: [course_id])

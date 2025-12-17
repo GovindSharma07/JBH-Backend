@@ -2,7 +2,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../utils/types";
 import ResumeService from "../services/resumeService";
 import { generatePresignedUploadUrl } from "../utils/storage";
-import { ApiError, BadRequestError } from "../utils/errors";
+import { AppError, BadRequestError } from "../utils/errors";
 
 class ResumeController {
   
@@ -40,7 +40,7 @@ class ResumeController {
         data: resume
       });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal Server Error" });
     }
   };
@@ -64,7 +64,7 @@ class ResumeController {
       
       return res.status(200).json({ message: "Resume deleted successfully" });
     } catch (error) {
-      if (error instanceof ApiError) return res.status(error.statusCode).json({ message: error.message });
+      if (error instanceof AppError) return res.status(error.statusCode).json({ message: error.message });
       return res.status(500).json({ message: "Internal Server Error" });
     }
   };
