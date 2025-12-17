@@ -22,6 +22,7 @@ router.get("/lessons/:id", AuthMiddleware.authenticate, LessonController.getOne)
 router.post("/courses", AuthMiddleware.authenticate, CourseController.create);
 router.put("/courses/:id", AuthMiddleware.authenticate, CourseController.update);   // <--- NEW
 router.delete("/courses/:id", AuthMiddleware.authenticate, CourseController.delete); // <--- NEW
+router.patch("/courses/:id/publish", AuthMiddleware.authenticate, CourseController.togglePublish);
 
 // 2. Modules
 router.post("/courses/:id/modules", AuthMiddleware.authenticate, CourseController.addModule);

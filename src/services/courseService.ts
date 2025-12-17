@@ -70,8 +70,9 @@ static async getCourseById(courseId: number) {
       data: {
         title: data.title,
         description: data.description,
-        price: data.price,
+        price: data.price || 0,
         thumbnail_url: data.thumbnail_url,
+        is_published: data.is_published || false
       }
     });
     await redisClient.del(CACHE_KEY_ALL); // Invalidate Cache
@@ -89,9 +90,12 @@ static async getCourseById(courseId: number) {
         description: data.description,
         price: data.price,
         thumbnail_url: data.thumbnail_url,
+        is_published: data.is_published
       }
     });
     await redisClient.del(CACHE_KEY_ALL); // Invalidate Cache
+    await redisClient.del(CACHE_KEY_PUBLIC); // Invalidate Cache
+
     return course;
   }
 
@@ -148,6 +152,19 @@ static async getCourseById(courseId: number) {
       )
     );
   }
+
+  // IMPROVEMENT: Specific method to Toggle Publish Status (Safer for simple toggle buttons)
+  static async togglePublishStatus(id: number, status: boolean) {
+    const course = await prisma.courses.update({
+      where: { course_id: id },
+      data: { is_published: status }
+    });
+    
+    await redisClient.del(CACHE_KEY_ALL); 
+    await redisClient.del(CACHE_KEY_PUBLIC);
+    return course;
+  }
+  
 }
 
 export default CourseService;

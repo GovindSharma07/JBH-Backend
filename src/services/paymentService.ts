@@ -81,6 +81,41 @@ class PaymentService {
 
     return generated_signature === razorpaySignature;
   }
+
+  // Add this method inside your PaymentService class
+static async handlePaymentSuccess(userId: number, courseId: number, orderId: string) {
+  // Use a Transaction to ensure both happen or neither happens
+  return await prisma.$transaction(async (tx) => {
+    
+    // 1. Update Payment Status
+    // We search by order_id (which you stored as payment_gateway_id)
+    const payment = await tx.payments.findFirst({
+      where: { payment_gateway_id: orderId }
+    });
+
+    if (payment) {
+      await tx.payments.update({
+        where: { payment_id: payment.payment_id },
+        data: { status: 'success' }
+      });
+    }
+
+    // 2. Enroll User (Idempotent: Checks existence first to avoid errors on retry)
+    const existingEnrollment = await tx.enrollments.findUnique({
+      where: { user_id_course_id: { user_id: userId, course_id: courseId } }
+    });
+
+    if (!existingEnrollment) {
+      await tx.enrollments.create({
+        data: {
+          user_id: userId,
+          course_id: courseId,
+          completion_status: 'in_progress'
+        }
+      });
+    }
+  });
+}
 }
 
 export default PaymentService;

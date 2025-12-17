@@ -39,7 +39,6 @@ class CourseController {
   static create = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const user = req.user as { role: string };
-      // Strict Role Check
       if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
 
       const newCourse = await CourseService.createCourse(req.body);
@@ -65,28 +64,36 @@ class CourseController {
     }
   };
 
-  // Student: Enroll (Free/Manual)
+static getMyCourses = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // The authMiddleware populates req.user
+      const user = req.user as { userId: number };
+
+      // Call the service we created earlier
+      const courses = await EnrollmentService.getMyCourses(user.userId);
+
+      return res.status(200).json(courses);
+    } catch (error) {
+      console.error("Get My Courses Error:", error);
+      return res.status(500).json({ message: "Failed to fetch enrolled courses" });
+    }
+  };
+
+  // 2. ENROLL (Free / Manual)
+  // This handles the free course enrollment logic
   static enroll = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const user = req.user as { userId: number };
-      const { id } = req.params; // Course ID
+      const { id } = req.params; // Course ID from URL
 
-      const enrollment = await EnrollmentService.enrollUser(user.userId, Number(id));
-      return res.status(201).json({ message: "Enrolled successfully", data: enrollment });
+      const result = await EnrollmentService.enrollUser(user.userId, Number(id));
+      
+      return res.status(200).json({ message: "Enrolled successfully", enrollment: result });
     } catch (error) {
-      if (error instanceof BadRequestError) return res.status(400).json({ message: error.message });
+      if (error instanceof BadRequestError) {
+        return res.status(400).json({ message: error.message });
+      }
       return res.status(500).json({ message: "Enrollment failed" });
-    }
-  };
-  
-  // Student: Get My Courses
-  static getMyCourses = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const user = req.user as { userId: number };
-      const courses = await EnrollmentService.getMyCourses(user.userId);
-      return res.status(200).json(courses);
-    } catch (error) {
-      return res.status(500).json({ message: "Error fetching your courses" });
     }
   };
 
@@ -161,6 +168,31 @@ class CourseController {
       return res.status(200).json({ message: "Modules reordered" });
     } catch (error) {
       return res.status(500).json({ message: "Failed to reorder modules" });
+    }
+  };
+
+  // NEW ENDPOINT: Toggle Publish Status
+  // Usage: PATCH /courses/:id/publish
+  // Body: { "is_published": true }
+  static togglePublish = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const user = req.user as { role: string };
+      if (user.role !== 'admin') return res.status(403).json({ message: "Admins only" });
+
+      const { id } = req.params;
+      const { is_published } = req.body;
+
+      if (typeof is_published !== 'boolean') {
+        return res.status(400).json({ message: "is_published must be a boolean" });
+      }
+
+      const updatedCourse = await CourseService.togglePublishStatus(Number(id), is_published);
+      return res.status(200).json({ 
+        message: is_published ? "Course published" : "Course unpublished",
+        course: updatedCourse 
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to update publish status" });
     }
   };
 }
