@@ -1,6 +1,7 @@
 import { Router } from "express";
 import AdminController from "../controllers/adminController";
 import AuthMiddleware from "../middlewares/authMiddleware";
+import { JobController } from "../controllers/jobController";
 
 const router = Router();
 
@@ -25,4 +26,5 @@ router.post("/admin/upload-url", AdminController.getUploadUrl);
 router.post("/admin/timetable", AdminController.createScheduleSlot);
 router.delete("/admin/timetable/:id", AdminController.deleteScheduleSlot);
 
+router.post('/jobs/cleanup', JobController.runCleanup);
 export default router;

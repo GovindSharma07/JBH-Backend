@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateUser, authorizeRoles } from '../middlewares/authMiddleware';
-import * as LMSController from '../controllers/lmsController';
+import LmsController from '../controllers/lmsController';
 
 const router = Router();
 
@@ -8,19 +8,19 @@ const router = Router();
 router.get(
     '/student/timetable',
     authenticateUser,
-    LMSController.getStudentTimetable
+    LmsController.getStudentTimetable
 );
 
 router.get(
     '/student/get-token',
     authenticateUser,
-    LMSController.joinClass
+    LmsController.joinClass
 );
 
 router.get(
     '/student/lesson/:lessonId',
     authenticateUser,
-    LMSController.getLessonDetails // Make sure to export this in lmsController
+    LmsController.getLessonDetails // Make sure to export this in lmsController
 );
 
 // --- INSTRUCTOR ROUTES ---
@@ -28,14 +28,14 @@ router.get(
     '/instructor/schedule',
     authenticateUser,
     authorizeRoles('instructor', 'admin'),
-    LMSController.getInstructorSchedule
+    LmsController.getInstructorSchedule
 );
 
 router.post(
     '/instructor/start-class',
     authenticateUser,
     authorizeRoles('instructor', 'admin'),
-    LMSController.startClass
+    LmsController.startLiveClass
 );
 
 export default router;
