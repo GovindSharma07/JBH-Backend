@@ -1,5 +1,6 @@
 import { PrismaClient } from '../generated/prisma/client';
 import { AppError } from '../utils/errors';
+import { getISTDate } from '../utils/time';
 import { generateVideoSDKToken } from '../utils/videoSdkClient';
 const prisma = new PrismaClient();
 
@@ -7,10 +8,12 @@ export class StudentService {
 
     // Get Consolidated Timetable (Math + Physics + etc.)
     static async getTodayTimetable(userId: number) {
+        const today = getISTDate();
+
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
         // FIX: Add 'as string' to force TypeScript to treat this as a string, not 'string | undefined'
-        const todayName = days[new Date().getDay()] as string;
+        const todayName = days[today.getDay()] as string;
 
         // 1. Find courses user is enrolled in
         const enrollments = await prisma.enrollments.findMany({
