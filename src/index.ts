@@ -31,6 +31,11 @@ app.use('/api',CourseRoutes);
 app.use('/api', PaymentRoutes);
 app.use('/api',AdminRoutes);
 
+// ✅ Add this Health Check Route for Cron Jobs
+app.get('/', (req, res) => {
+  res.status(200).send('JBH Backend is Running 🚀');
+});
+
 // To start the server
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
