@@ -137,16 +137,16 @@ export class StudentService {
 
         // 2. Fetch ALL schedule slots for these courses (No day filter)
         const schedule = await prisma.time_table.findMany({
-            where: {
-                course_id: { in: courseIds }
-            },
+            where: { course_id: { in: courseIds } },
             include: {
                 course: { select: { title: true, thumbnail_url: true } },
-                instructor: { select: { full_name: true } }
+                // ✅ Select Instructor Name
+                instructor: { select: { full_name: true } },
+                // ✅ Select Subject/Topic (Module Title)
+                module: { select: { title: true } }
             },
             orderBy: [
-                { course_id: 'asc' }, // Group by course first
-                // Then sort by day (Custom sort might be needed on frontend, or use enum mapping)
+                { course_id: 'asc' }, 
                 { start_time: 'asc' }
             ]
         });
