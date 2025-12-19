@@ -123,4 +123,34 @@ export class StudentService {
             topic: record.live_lecture.lesson.title
         }));
     }
+
+    // NEW: Get Weekly Timetable for all enrolled courses
+    static async getWeeklyTimetable(userId: number) {
+        // 1. Get Enrolled Course IDs
+        const enrollments = await prisma.enrollments.findMany({
+            where: { user_id: userId },
+            select: { course_id: true }
+        });
+        const courseIds = enrollments.map(e => e.course_id);
+
+        if (courseIds.length === 0) return [];
+
+        // 2. Fetch ALL schedule slots for these courses (No day filter)
+        const schedule = await prisma.time_table.findMany({
+            where: {
+                course_id: { in: courseIds }
+            },
+            include: {
+                course: { select: { title: true, thumbnail_url: true } },
+                instructor: { select: { full_name: true } }
+            },
+            orderBy: [
+                { course_id: 'asc' }, // Group by course first
+                // Then sort by day (Custom sort might be needed on frontend, or use enum mapping)
+                { start_time: 'asc' }
+            ]
+        });
+
+        return schedule;
+    }
 }

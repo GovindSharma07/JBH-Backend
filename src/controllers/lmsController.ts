@@ -119,6 +119,15 @@ class LmsController {
             res.json({ success: true, attendance });
         } catch (e) { next(e); }
     };
+
+    static getWeeklyTimetable = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            if (!req.user || !req.user.userId) throw new AppError("Unauthorized", 401);
+
+            const schedule = await StudentService.getWeeklyTimetable(req.user.userId);
+            res.json({ success: true, schedule });
+        } catch (e) { next(e); }
+    };
 }
 
 export default LmsController;

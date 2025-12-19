@@ -26,6 +26,18 @@ router.get(
     LmsController.getLessonDetails // Make sure to export this in lmsController
 );
 
+router.get(
+    '/student/attendance',
+    authenticateUser,
+    LmsController.getAttendance
+);
+
+router.get(
+    '/student/timetable/weekly', // New Endpoint
+    authenticateUser,
+    LmsController.getWeeklyTimetable
+);
+
 // --- INSTRUCTOR ROUTES ---
 router.get(
     '/instructor/schedule',
@@ -44,10 +56,8 @@ router.post(
 
 router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
 
-router.get(
-    '/student/attendance',
-    authenticateUser,
-    LmsController.getAttendance
-);
+
+
+
 
 export default router;
