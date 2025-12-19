@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authenticateUser, authorizeRoles } from '../middlewares/authMiddleware';
 import LmsController from '../controllers/lmsController';
+import { validate } from '../middlewares/validate';
+import { joinClassSchema,startClassSchema } from '../utils/validators';
 
 const router = Router();
 
@@ -11,9 +13,10 @@ router.get(
     LmsController.getStudentTimetable
 );
 
-router.get(
-    '/student/get-token',
+router.post(
+    '/student/join-class',
     authenticateUser,
+    validate(joinClassSchema),
     LmsController.joinClass
 );
 
@@ -35,6 +38,7 @@ router.post(
     '/instructor/start-class',
     authenticateUser,
     authorizeRoles('instructor', 'admin'),
+    validate(startClassSchema),
     LmsController.startLiveClass
 );
 

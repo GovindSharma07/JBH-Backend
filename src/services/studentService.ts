@@ -1,8 +1,8 @@
-import { PrismaClient } from '../generated/prisma/client';
+import prisma from '../utils/prisma';
 import { AppError } from '../utils/errors';
 import { getISTDate } from '../utils/time';
 import { generateVideoSDKToken } from '../utils/videoSdkClient';
-const prisma = new PrismaClient();
+
 
 export class StudentService {
 

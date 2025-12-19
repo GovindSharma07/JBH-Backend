@@ -83,12 +83,16 @@ class LmsController {
         } catch (e) { next(e); }
     };
 
+    // [FIX] Updated to pass userId for enrollment verification
     static getLessonDetails = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
         try {
             const { lessonId } = req.params;
             if (!lessonId) throw new AppError("Lesson ID is required", 400);
 
-            const lesson = await LessonService.getLessonDetails(Number(lessonId));
+            if (!req.user || !req.user.userId) throw new AppError("Unauthorized", 401);
+
+            // Pass user ID to service
+            const lesson = await LessonService.getLessonDetails(Number(lessonId), req.user.userId);
 
             res.json({ success: true, lesson });
         } catch (e) { next(e); }

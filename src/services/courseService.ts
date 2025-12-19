@@ -1,9 +1,7 @@
-// src/services/courseService.ts
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import redisClient from "../utils/redisClient";
 import { BadRequestError } from "../utils/errors";
 
-const prisma = new PrismaClient();
 const CACHE_KEY_ALL = "courses:all_summary";     // Key for Admins (contains drafts)
 const CACHE_KEY_PUBLIC = "courses:public_summary"; // Key for Students (published only)
 

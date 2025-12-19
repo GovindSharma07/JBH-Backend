@@ -1,11 +1,10 @@
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { BadRequestError } from "../utils/errors"; // Assuming you have an AppError or NotFoundError class too
 import bcrypt from "bcryptjs";
 import redisClient from "../utils/redisClient";
 import { validateEmail, validatePassword } from "../utils/validation";
 import { generatePresignedUploadUrl } from "../utils/storage";
 
-const prisma = new PrismaClient();
 
 export class AdminService {
 

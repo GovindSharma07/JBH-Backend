@@ -1,7 +1,7 @@
 {
   "name": "jbh",
   "version": "1.0.0",
-  "main": "dist/index.js", 
+  "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon ./src/index.ts",
     "build": "prisma generate && tsc",
@@ -21,11 +21,12 @@
     "jsonwebtoken": "^9.0.3",
     "node-cron": "^4.2.1",
     "pg": "^8.16.3",
+    "prisma": "^6.19.0",
     "razorpay": "^2.9.6",
     "redis": "^5.10.0",
     "twilio": "^5.10.5",
-    "prisma": "^6.19.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

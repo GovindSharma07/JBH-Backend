@@ -1,11 +1,11 @@
 // src/services/apprenticeshipService.ts
 
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { AppError, BadRequestError } from "../utils/errors";
 import redisClient from "../utils/redisClient";
 import ResumeService from "./resumeService";
 
-const prisma = new PrismaClient();
+
 
 class ApprenticeshipService {
   

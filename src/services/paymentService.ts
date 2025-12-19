@@ -1,9 +1,9 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { BadRequestError } from "../utils/errors";
 
-const prisma = new PrismaClient();
+
 
 // Initialize Razorpay
 const razorpay = new Razorpay({

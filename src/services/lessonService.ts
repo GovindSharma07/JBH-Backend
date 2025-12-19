@@ -1,7 +1,6 @@
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { AppError, BadRequestError } from "../utils/errors";
 
-const prisma = new PrismaClient();
 
 class LessonService {
   
@@ -102,11 +101,11 @@ class LessonService {
     );
   }
 
-  // NEW: Fetch detailed lesson info (Recording or Live)
-  static async getLessonDetails(lessonId: number) {
+ static async getLessonDetails(lessonId: number, userId: number) {
     const lesson = await prisma.lessons.findUnique({
       where: { lesson_id: lessonId },
       include: {
+        module: true, // Required to find course_id for permission check
         live_lecture: {
           select: {
             status: true,
@@ -119,6 +118,24 @@ class LessonService {
     });
 
     if (!lesson) throw new AppError("Lesson not found", 404);
+
+    // --- SECURITY CHECK ---
+    if (!lesson.is_free) {
+        const enrollment = await prisma.enrollments.findUnique({
+            where: {
+                user_id_course_id: {
+                    user_id: userId,
+                    course_id: lesson.module.course_id
+                }
+            }
+        });
+
+        if (!enrollment) {
+            throw new AppError("You must be enrolled in this course to view this lesson.", 403);
+        }
+    }
+    // ----------------------
+
     return lesson;
   }
 }

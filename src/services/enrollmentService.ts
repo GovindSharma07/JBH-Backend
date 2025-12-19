@@ -1,7 +1,6 @@
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { BadRequestError } from "../utils/errors";
 
-const prisma = new PrismaClient();
 
 class EnrollmentService {
   

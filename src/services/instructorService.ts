@@ -1,11 +1,10 @@
 // src/services/instructorService.ts
 
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { AppError } from "../utils/errors";
 import { createMeetingRoom } from "../utils/videoSdkClient"; // Ensure this import exists
 import { getISTDate } from "../utils/time";
 
-const prisma = new PrismaClient();
 
 class InstructorService {
 
@@ -106,7 +105,6 @@ class InstructorService {
     if (schedule.instructor_id !== userId) throw new AppError("Unauthorized access to this schedule", 403);
 
     // B. Check for EXISTING Live Class (Resume Logic)
-    // If the instructor crashed and rejoined within 12 hours, return the SAME room.
     const existingLive = await prisma.live_lectures.findFirst({
       where: {
         instructor_id: userId,
@@ -124,75 +122,87 @@ class InstructorService {
       };
     }
 
-    // C. Create Module: "Classes - [Today's Date]"
-    const todayStr = new Date().toDateString(); // e.g., "Mon Dec 25 2023"
-    const moduleName = `Classes - ${todayStr}`;
+    // [FIX] C. Group Modules by Month using IST Date
+    const istDate = getISTDate();
+    // Get Month Name (e.g., "December")
+    const monthName = istDate.toLocaleString('default', { month: 'long' });
+    const year = istDate.getFullYear();
+    
+    // Module Name: "Live Classes - December 2025"
+    const moduleName = `Live Classes - ${monthName} ${year}`;
 
-    let module = await prisma.syllabus_modules.findFirst({
-      where: {
-        course_id: schedule.course_id,
-        title: moduleName
-      }
-    });
-
-    if (!module) {
-      // Find the last module order to append to the end
-      const lastModule = await prisma.syllabus_modules.findFirst({
-        where: { course_id: schedule.course_id },
-        orderBy: { module_order: 'desc' }
-      });
-      const newOrder = (lastModule?.module_order || 0) + 1;
-
-      module = await prisma.syllabus_modules.create({
-        data: {
+    // Use Transaction to prevent race conditions during creation
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Find or Create Module
+      let module = await tx.syllabus_modules.findFirst({
+        where: {
           course_id: schedule.course_id,
-          title: moduleName,
-          module_order: newOrder
+          title: moduleName
         }
       });
-    }
 
-    // D. Calculate Lesson Order
-    const lastLesson = await prisma.lessons.findFirst({
-      where: { module_id: module.module_id },
-      orderBy: { lesson_order: 'desc' }
-    });
-    const nextLessonOrder = (lastLesson?.lesson_order || 0) + 1;
+      if (!module) {
+        // Find the last module order
+        const lastModule = await tx.syllabus_modules.findFirst({
+          where: { course_id: schedule.course_id },
+          orderBy: { module_order: 'desc' }
+        });
+        const newOrder = (lastModule?.module_order || 0) + 1;
 
-    // E. Create Lesson Placeholder
-    const lesson = await prisma.lessons.create({
-      data: {
-        module_id: module.module_id,
-        title: topic || "Live Session",
-        content_type: 'live', // Ensure 'live' is in your ContentType enum
-        content_url: '',
-        is_free: false,
-        lesson_order: nextLessonOrder
+        module = await tx.syllabus_modules.create({
+          data: {
+            course_id: schedule.course_id,
+            title: moduleName,
+            module_order: newOrder
+          }
+        });
       }
-    });
 
-    // F. Create VideoSDK Room
-    const roomId = await createMeetingRoom();
+      // 2. Calculate Lesson Order
+      const lastLesson = await tx.lessons.findFirst({
+        where: { module_id: module.module_id },
+        orderBy: { lesson_order: 'desc' }
+      });
+      const nextLessonOrder = (lastLesson?.lesson_order || 0) + 1;
 
-    // G. Create Live Lecture Entry
-    const startTime = new Date();
-    const estimatedEndTime = new Date(startTime.getTime() + 60 * 60 * 1000); // +1 hour
+      // 3. Create Lesson Placeholder
+      const lesson = await tx.lessons.create({
+        data: {
+          module_id: module.module_id,
+          title: `${topic} (${istDate.getDate()} ${monthName})`, // e.g. "Physics (17 December)"
+          content_type: 'live', 
+          content_url: '',
+          is_free: false,
+          lesson_order: nextLessonOrder
+        }
+      });
 
-    const liveLecture = await prisma.live_lectures.create({
-      data: {
-        room_id: roomId,
-        instructor_id: userId,
-        lesson_id: lesson.lesson_id,
-        start_time: startTime,
-        end_time: estimatedEndTime,
-        status: 'live'
-      }
+      // 4. Create VideoSDK Room
+      // (Note: We call external API outside transaction usually, but here needed for DB insert. 
+      // If API fails, transaction rolls back, which is good.)
+      const roomId = await createMeetingRoom();
+
+      const startTime = new Date(); // Server time for DB is fine, as long as Logic used IST
+      const estimatedEndTime = new Date(startTime.getTime() + 60 * 60 * 1000); 
+
+      const liveLecture = await tx.live_lectures.create({
+        data: {
+          room_id: roomId,
+          instructor_id: userId,
+          lesson_id: lesson.lesson_id,
+          start_time: startTime,
+          end_time: estimatedEndTime,
+          status: 'live'
+        }
+      });
+
+      return { roomId, liveLecture, lesson };
     });
 
     return {
-      roomId,
-      liveLectureId: liveLecture.live_lecture_id,
-      lessonId: lesson.lesson_id,
+      roomId: result.roomId,
+      liveLectureId: result.liveLecture.live_lecture_id,
+      lessonId: result.lesson.lesson_id,
       message: "Class started successfully"
     };
   }

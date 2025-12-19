@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { PrismaClient, users, VerificationTokenPurpose } from "../generated/prisma/client";
+import { users, VerificationTokenPurpose } from "../generated/prisma/client";
 import jwt from "jsonwebtoken";
 import { generateSecureToken, generateNumericCode } from "../utils/token";
 import EmailService from "./emailService";
@@ -13,8 +13,9 @@ import {
   BadRequestError,
 } from "../utils/errors";
 import redisClient from "../utils/redisClient";
+import prisma from "../utils/prisma";
 
-const prisma = new PrismaClient();
+
 const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
 class AuthService {

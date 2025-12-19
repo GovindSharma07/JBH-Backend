@@ -1,7 +1,6 @@
-import { PrismaClient } from "../generated/prisma/client";
+import prisma from "../utils/prisma";
 import { BadRequestError, UserNotFoundError } from "../utils/errors";
 
-const prisma = new PrismaClient();
 
 class ResumeService {
   static async addResume(userId: number, data: { name: string; file_url: string }) {
