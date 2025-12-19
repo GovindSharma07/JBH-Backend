@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { InstructorService } from '../services/instructorService';
+import InstructorService from '../services/instructorService';
 import { StudentService } from '../services/studentService';
 import LessonService from '../services/lessonService';
 import { AppError } from '../utils/errors';
@@ -93,30 +93,19 @@ class LmsController {
             res.json({ success: true, lesson });
         } catch (e) { next(e); }
     };
+
+    static getInstructorDashboard = async (req: AuthenticatedRequest, res: Response) => {
+        try {
+            const user = req.user;
+            if (user?.role !== 'instructor') return res.status(403).json({ message: "Instructors only" });
+
+            const data = await InstructorService.getDashboardData(user.userId);
+            return res.status(200).json(data);
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: "Failed to load dashboard" });
+        }
+    }
 }
 
 export default LmsController;
-
-export function getStudentTimetable(arg0: string, authenticateUser: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>, getStudentTimetable: any) {
-    throw new Error('Function not implemented.');
-}
-
-
-export function joinClass(arg0: string, authenticateUser: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>, joinClass: any) {
-    throw new Error('Function not implemented.');
-}
-
-
-export function getLessonDetails(arg0: string, authenticateUser: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>, getLessonDetails: any) {
-    throw new Error('Function not implemented.');
-}
-
-
-export function getInstructorSchedule(arg0: string, authenticateUser: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>, arg2: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined, getInstructorSchedule: any) {
-    throw new Error('Function not implemented.');
-}
-
-
-export function startClass(arg0: string, authenticateUser: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<Response<any, Record<string, any>> | undefined>, arg2: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Response<any, Record<string, any>> | undefined, startClass: any) {
-    throw new Error('Function not implemented.');
-}

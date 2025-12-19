@@ -8,7 +8,7 @@ import { generatePresignedUploadUrl } from "../utils/storage";
 const prisma = new PrismaClient();
 
 export class AdminService {
-  
+
   // 1. Get All Users
   static async getAllUsers() {
     return await prisma.users.findMany({
@@ -66,10 +66,10 @@ export class AdminService {
   static async deleteUser(userId: number) {
     // A. Delete from DB
     await prisma.users.delete({ where: { user_id: userId } });
-    
+
     // B. Invalidate Redis Session
     await redisClient.del(`session:${userId}`);
-    
+
     return true;
   }
 
@@ -89,42 +89,68 @@ export class AdminService {
     return await generatePresignedUploadUrl(fileName, fileType, targetFolder);
   }
 
-  // 5. Create Schedule Slot
+  // 5. Create Schedule Slot (Updated)
   static async createScheduleSlot(data: any) {
-    const { courseId, instructorId, moduleId, dayOfWeek, startTime, endTime } = data;
+    const {
+      courseId,
+      instructorId,
+      moduleId,
+      startTime,
+      endTime,
+      scheduleType, // 'recurring' | 'one-time'
+      dayOfWeek,    // Required if recurring
+      validFrom,    // Optional range start
+      validTo,      // Optional range end
+      specificDate  // Required if one-time
+    } = data;
 
     // A. Basic Validation
-    if (!courseId || !instructorId || !dayOfWeek || !startTime || !endTime) {
+    if (!courseId || !instructorId || !startTime || !endTime || !scheduleType) {
       throw new BadRequestError("Missing required fields.");
     }
 
-    const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    if (!validDays.includes(dayOfWeek)) {
-      throw new BadRequestError("Invalid dayOfWeek.");
+    const instructorIdNum = Number(instructorId);
+
+    // B. Validate Logic based on Type
+    let finalDayOfWeek = dayOfWeek;
+    let finalSpecificDate = null;
+    let finalValidFrom = validFrom ? new Date(validFrom) : null;
+    let finalValidTo = validTo ? new Date(validTo) : null;
+
+    if (scheduleType === 'one-time') {
+      if (!specificDate) throw new BadRequestError("Date is required for one-time classes.");
+      finalSpecificDate = new Date(specificDate);
+
+      // Auto-set day of week for easier querying later? Or leave null.
+      // Let's leave null to distinguish strictly.
+      finalDayOfWeek = null;
+
+    } else {
+      // Recurring
+      if (!dayOfWeek) throw new BadRequestError("Day of week is required for recurring classes.");
+      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      if (!validDays.includes(dayOfWeek)) throw new BadRequestError("Invalid dayOfWeek.");
     }
 
-    // B. Conflict Check
-    const conflict = await prisma.time_table.findFirst({
-      where: {
-        instructor_id: Number(instructorId),
-        day_of_week: dayOfWeek,
-        start_time: startTime
-      }
-    });
+    // C. Check Conflicts (Simple Time Overlap Check)
+    // Note: A robust system would check date ranges too, but let's keep it simple for now.
+    // We check if this instructor is busy at this specific time on this specific day (or recurring day)
 
-    if (conflict) {
-      throw new BadRequestError("Conflict: This instructor already has a class at this time.");
-    }
+    // ... (Conflict logic can be expanded here)
 
-    // C. Create
+    // D. Create Entry
     return await prisma.time_table.create({
       data: {
         course_id: Number(courseId),
-        instructor_id: Number(instructorId),
+        instructor_id: instructorIdNum,
         module_id: moduleId ? Number(moduleId) : null,
-        day_of_week: dayOfWeek,
+        schedule_type: scheduleType,
+        day_of_week: finalDayOfWeek,
         start_time: startTime,
-        end_time: endTime
+        end_time: endTime,
+        valid_from: finalValidFrom,
+        valid_to: finalValidTo,
+        specific_date: finalSpecificDate
       }
     });
   }

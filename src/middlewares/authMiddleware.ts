@@ -1,3 +1,4 @@
+// src/middlewares/authMiddleware.ts
 import { Response, NextFunction } from "express";
 import { verifyToken } from "../utils/jwt";
 import { AuthenticatedRequest } from "../utils/types";
@@ -12,15 +13,19 @@ class AuthMiddleware {
     const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({
-        message: "No Token Provided",
-      });
+      return res.status(401).json({ message: "No Token Provided" });
     }
     try {
-      // 1. Verify Signature
       const decode = verifyToken(token) as { userId: number; role: string };
 
-      // 2. Check Redis Cache
+      // FIX: Normalize role to lowercase immediately
+      // This ensures 'Instructor', 'INSTRUCTOR', and 'instructor' are all treated as 'instructor'
+      req.user = { 
+        ...decode, 
+        role: decode.role.toLowerCase() 
+      };
+
+      // Check Redis Cache
       const sessionKey = `session:${decode.userId}`;
       const cachedSession = await redisClient.get(sessionKey);
 
@@ -28,8 +33,6 @@ class AuthMiddleware {
         return res.status(401).json({ message: "Session expired. Please login again." });
       }
 
-      // 3. Attach User to Request
-      req.user = decode;
       next();
     } catch (error) {
       res.status(401).json({
@@ -40,30 +43,20 @@ class AuthMiddleware {
   };
 }
 
-// --- EXPORTS FOR LMS ROUTES ---
-
-// 1. Export 'authenticateUser' (Alias for existing logic)
+// ... (keep exports same as before)
 export const authenticateUser = AuthMiddleware.authenticate;
-
-// 2. Export 'authorizeRoles' (Fixed Type Casting)
 export const authorizeRoles = (...allowedRoles: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    // 1. Safety Check: Ensure user exists
-    if (!req.user) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-    // 2. Explicitly Cast User to the expected type
-    // This tells TypeScript: "Trust me, req.user has a role property"
+    // With the fix above, req.user.role is guaranteed to be lowercase now
     const user = req.user as { userId: number; role: string };
 
-    // 3. Check Role
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({ 
         message: "Forbidden: You do not have permission to access this resource" 
       });
     }
-
     next();
   };
 };

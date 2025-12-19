@@ -180,19 +180,22 @@ model live_lectures {
 model time_table {
   schedule_id     Int      @id @default(autoincrement())
   course_id       Int
-  
-  // --- NEW: Multi-Instructor Logic ---
-  // We assign a specific instructor to a specific slot
   instructor_id   Int
   instructor      users    @relation("ScheduleInstructor", fields: [instructor_id], references: [user_id])
-
-  // Optional: Link to a specific Subject (Module)
   module_id       Int?
   module          syllabus_modules? @relation(fields: [module_id], references: [module_id])
 
-  // Recurring Schedule Logic
-  day_of_week     String   @db.VarChar(15) // "Monday", "Tuesday"
-  start_time      String   @db.VarChar(10) // "10:00 AM" 
+  // --- NEW FIELDS (Required for the fix) ---
+  schedule_type   String   @default("recurring") // 'recurring' or 'one-time'
+  
+  // Update day_of_week to be Nullable (String?) because one-time classes don't need it
+  day_of_week     String?  @db.VarChar(15)       
+  
+  valid_from      DateTime?                      
+  valid_to        DateTime?                      
+  specific_date   DateTime? // For one-time classes
+  
+  start_time      String   @db.VarChar(10) 
   end_time        String   @db.VarChar(10)
   
   course          courses        @relation(fields: [course_id], references: [course_id], onDelete: Cascade)

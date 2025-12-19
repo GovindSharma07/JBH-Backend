@@ -38,4 +38,6 @@ router.post(
     LmsController.startLiveClass
 );
 
+router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
+
 export default router;
