@@ -44,4 +44,10 @@ router.post(
 
 router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
 
+router.get(
+    '/student/attendance',
+    authenticateUser,
+    LmsController.getAttendance
+);
+
 export default router;

@@ -101,4 +101,26 @@ export class StudentService {
             meetingUrl: lecture.meeting_url
         };
     }
+
+    static async getAttendance(userId: number) {
+        // Fetch all attendance records for this user
+        const records = await prisma.attendance.findMany({
+            where: { user_id: userId },
+            include: {
+                live_lecture: {
+                    include: {
+                        lesson: { select: { title: true } } // Get class topic name
+                    }
+                }
+            },
+            orderBy: { recorded_at: 'desc' }
+        });
+
+        // Format it nicely for the frontend
+        return records.map(record => ({
+            date: record.recorded_at,
+            status: record.status,
+            topic: record.live_lecture.lesson.title
+        }));
+    }
 }

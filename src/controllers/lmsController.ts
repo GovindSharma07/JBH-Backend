@@ -110,6 +110,15 @@ class LmsController {
             return res.status(500).json({ message: "Failed to load dashboard" });
         }
     }
+
+    static getAttendance = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            if (!req.user || !req.user.userId) throw new AppError("Unauthorized", 401);
+
+            const attendance = await StudentService.getAttendance(req.user.userId);
+            res.json({ success: true, attendance });
+        } catch (e) { next(e); }
+    };
 }
 
 export default LmsController;
