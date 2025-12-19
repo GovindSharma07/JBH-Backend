@@ -145,6 +145,24 @@ class ApprenticeshipService {
         orderBy: { submitted_at: 'desc' }
     });
   }
+
+  static async getApplications(apprenticeshipId?: number) {
+    
+    const whereClause = apprenticeshipId ? { apprenticeship_id: apprenticeshipId } : {};
+
+    return await prisma.apprenticeship_applications.findMany({
+        where: whereClause, 
+        include: {
+            user: {
+                select: { full_name: true, email: true, phone: true }
+            },
+            apprenticeship: {
+                select: { title: true, company_name: true }
+            }
+        },
+        orderBy: { submitted_at: 'desc' }
+    });
+  }
 }
 
 export default ApprenticeshipService;

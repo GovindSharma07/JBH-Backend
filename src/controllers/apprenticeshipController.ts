@@ -7,12 +7,12 @@ import { AppError, BadRequestError } from "../utils/errors";
 import { generatePresignedUploadUrl } from "../utils/storage";
 
 class ApprenticeshipController {
-  
+
   // 1. Create (Admin Only)
   static create = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userPayload = req.user as { userId: number, role: string };
-      
+
       // Strict Role Check
       if (userPayload.role !== 'admin') {
         return res.status(403).json({ message: "Access denied. Admins only." });
@@ -68,10 +68,10 @@ class ApprenticeshipController {
 
       const application = await ApprenticeshipService.applyForApprenticeship(
         userPayload.userId,
-        { 
-          apprenticeship_id: Number(apprenticeship_id), 
-          resume_id: Number(resume_id), 
-          message 
+        {
+          apprenticeship_id: Number(apprenticeship_id),
+          resume_id: Number(resume_id),
+          message
         }
       );
 
@@ -90,16 +90,21 @@ class ApprenticeshipController {
   // 5. Get All Applications (Admin Only)
   static getAdminApplications = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const userPayload = req.user as { role: string };
-        if (userPayload.role !== 'admin') {
-            return res.status(403).json({ message: "Access denied. Admins only." });
-        }
+      const userPayload = req.user as { role: string };
+      if (userPayload.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admins only." });
+      }
 
-        const data = await ApprenticeshipService.getAllApplications();
-        return res.status(200).json(data);
+      // Check if a specific Job ID is requested
+      const { apprenticeshipId } = req.query;
+      const id = apprenticeshipId ? Number(apprenticeshipId) : undefined;
+
+      const data = await ApprenticeshipService.getApplications(id);
+
+      return res.status(200).json(data);
     } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Internal Server Error" });
+      console.error(error);
+      return res.status(500).json({ message: "Internal Server Error" });
     }
   }
 
