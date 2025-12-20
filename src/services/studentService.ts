@@ -9,11 +9,15 @@ export class StudentService {
     // Get Consolidated Timetable (Math + Physics + etc.)
     static async getTodayTimetable(userId: number) {
         const today = getISTDate();
-
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-        // FIX: Add 'as string' to force TypeScript to treat this as a string, not 'string | undefined'
         const todayName = days[today.getDay()] as string;
+
+        // Create Date Range for TODAY (00:00 to 23:59)
+        const startOfDay = new Date(today);
+        startOfDay.setHours(0, 0, 0, 0);
+        
+        const endOfDay = new Date(today);
+        endOfDay.setHours(23, 59, 59, 999);
 
         // 1. Find courses user is enrolled in
         const enrollments = await prisma.enrollments.findMany({
@@ -25,28 +29,42 @@ export class StudentService {
 
         if (courseIds.length === 0) return [];
 
-        // 2. Get Schedule for these courses
+        // 2. Get Schedule (Recurring OR One-Time)
         const schedule = await prisma.time_table.findMany({
             where: {
                 course_id: { in: courseIds },
-                // Now 'todayName' is strictly a string, so this works
-                day_of_week: { equals: todayName, mode: 'insensitive' }
+                OR: [
+                    // Case A: Recurring Class (Matches Day Name)
+                    {
+                        schedule_type: 'recurring',
+                        day_of_week: { equals: todayName, mode: 'insensitive' }
+                    },
+                    // Case B: One-Time Class (Matches Date)
+                    {
+                        schedule_type: 'one-time',
+                        specific_date: {
+                            gte: startOfDay,
+                            lte: endOfDay
+                        }
+                    }
+                ]
             },
             include: {
                 course: { select: { title: true, thumbnail_url: true } },
-                module: { select: { title: true } }, // Subject
-                instructor: { select: { full_name: true, user_id: true } } // Teacher Name
+                module: { select: { title: true } }, 
+                instructor: { select: { full_name: true, user_id: true } }
             },
             orderBy: { start_time: 'asc' }
         });
 
-        // 3. (Advanced) Check if any of these are currently LIVE
+        // 3. Check for Active Live Status
         const enhancedSchedule = await Promise.all(schedule.map(async (slot) => {
             const activeClass = await prisma.live_lectures.findFirst({
                 where: {
                     instructor_id: slot.instructor_id,
                     status: 'live',
-                    start_time: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } // Started today
+                    // Check if a live room was created in the last 12 hours
+                    start_time: { gte: new Date(Date.now() - 12 * 60 * 60 * 1000) } 
                 }
             });
 
