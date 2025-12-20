@@ -7,6 +7,25 @@ import { AuthenticatedRequest } from '../utils/types';
 import { generateVideoSDKToken } from '../utils/videoSdkClient';
 
 class LmsController {
+    static endLiveClass = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+        try {
+            // 1. Safe User Extraction
+            const user = req.user;
+            if (!user || !user.userId) throw new AppError("Unauthorized", 401);
+            const { liveLectureId } = req.body;
+
+            // 2. Validation
+            if (!liveLectureId) throw new AppError("Live Lecture ID is required", 400);
+            // 3. Call Service to End Class
+            await InstructorService.endLiveClass(user.userId, Number(liveLectureId));
+            // 4. Response
+            res.json({
+                success: true,
+                message: "Class ended successfully"
+            });
+        } catch (e) { next(e); }
+    };
+    
 
     // --- INSTRUCTOR ---
 

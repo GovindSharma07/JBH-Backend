@@ -54,6 +54,13 @@ router.post(
     LmsController.startLiveClass
 );
 
+router.post(
+    '/instructor/end-class',
+    authenticateUser,
+    authorizeRoles('instructor', 'admin'),
+    LmsController.endLiveClass
+);
+
 router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
 
 
