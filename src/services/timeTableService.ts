@@ -29,7 +29,7 @@ export class TimeTableService {
   }
 
   // Get upcoming LIVE lectures (One-off sessions scheduled for today)
-  static async getUpcomingLiveLectures(userId: number) {
+ static async getUpcomingLiveLectures(userId: number) {
     const enrollments = await prisma.enrollments.findMany({
       where: { user_id: userId },
       select: { course_id: true }
@@ -40,31 +40,21 @@ export class TimeTableService {
     const endOfDay = new Date();
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Find Live Lectures happening TODAY
-    return await prisma.live_lectures.findMany({
+    // FIX: Query 'time_table' instead of 'live_lectures'
+    return await prisma.time_table.findMany({
       where: {
-        start_time: {
-          gte: now,
-          lte: endOfDay
-        },
-        lesson: {
-          module: {
-            course_id: { in: courseIds }
-          }
+        course_id: { in: courseIds },
+        // Check for One-Time classes today
+        schedule_type: 'one-time', 
+        specific_date: {
+            gte: now,
+            lte: endOfDay
         }
       },
       include: {
-        lesson: {
-          include: {
-            module: {
-              include: {
-                 course: { select: { title: true } }
-              }
-            }
-          }
-        }
+        course: { select: { title: true, thumbnail_url: true } }
       },
       orderBy: { start_time: 'asc' }
     });
-  }
+}
 }

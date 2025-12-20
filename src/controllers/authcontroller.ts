@@ -40,8 +40,8 @@ static signup = async (req: Request, res: Response) => {
   static login = async (req: Request, res: Response) => {
     const { email, password } = req.body;
     try { 
-      const token = await AuthService.loginUser(email, password);
-      return res.status(200).json({ message: "Login successful", token: token });
+      const data = await AuthService.loginUser(email, password);
+      return res.status(200).json({ message: "Login successful", token: data[0], user: data[1]   });
     } catch (error) {
       // --- UPDATED LOGIC ---
       if (error instanceof EmailNotVerifiedError || error instanceof PhoneNotVerifiedError) {
