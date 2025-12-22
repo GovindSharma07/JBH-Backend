@@ -20,7 +20,7 @@ export const generateVideoSDKToken = (role: 'participant' | 'moderator' = 'parti
     apikey: VIDEOSDK_API_KEY,
     permissions: role === 'moderator' 
       ? ['allow_join', 'allow_mod', 'allow_publish']  // <--- Added allow_publish
-      : ['allow_join', 'allow_publish'],               // <--- Added allow_publish
+      : ['allow_join'],
     version: 2,
     roles: [role] 
   };
