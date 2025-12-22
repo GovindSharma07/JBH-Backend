@@ -31,32 +31,44 @@ export const generateVideoSDKToken = (role: 'participant' | 'moderator' = 'parti
 
 export const createMeetingRoom = async () => {
   try {
-
-
     const webhookEndpoint = process.env.VIDEOSDK_WEBHOOK_ENDPOINT!;
+    
+    // [FIX] Ensure these exist in your .env file
+    const b2AccessKey = process.env.B2_KEY_ID;
+    const b2SecretKey = process.env.B2_APP_KEY;
+    const region = process.env.B2_REGION;
+    const b2Bucket = process.env.B2_BUCKET_NAME;
+    const b2Endpoint = process.env.B2_ENDPOINT; // e.g. s3.us-east-005.backblazeb2.com
 
     const token = generateVideoSDKToken('moderator');
     const url = `${VIDEOSDK_API_ENDPOINT}/rooms`;
 
     const response = await axios.post(url, {
-      // Simple Auto-Recording Config
       autoStartConfig: {
         recording: {
           enabled: true,
-
           webhookUrl: webhookEndpoint,
-          // "SPOTLIGHT" = Records ONLY the active focus (Camera OR Screen OR Board)
+          
+          // [FIX 1] ADD STORAGE CONFIGURATION (awsLayer)
+          // This forces VideoSDK to upload to YOUR Backblaze bucket
+          awsLayer: {
+            accessKeyId: b2AccessKey,
+            secretAccessKey: b2SecretKey,
+            bucketName: b2Bucket,
+            endpoint: b2Endpoint, // Critical for Backblaze/DigitalOcean/etc.
+            region: region
+          },
+
+          // [FIX 2] LAYOUT CONFIGURATION
           layout: {
             type: "SPOTLIGHT",
-            priority: "PIN", // Records the pinned instructor
+            priority: "PIN", // Logic: Records whoever is Pinned
+            gridSize: 2,     // (Ignored in Spotlight, but good to keep low)
           },
 
           theme: "DARK",
           mode: "video-and-audio",
-
-          // "med" = 720p (HD) -> Cost effective & Good Quality
-          quality: "med",
-
+          quality: "med", // 720p
           orientation: "landscape",
         }
       }
