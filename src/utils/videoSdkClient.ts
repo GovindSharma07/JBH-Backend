@@ -19,15 +19,15 @@ export const generateVideoSDKToken = (role: 'participant' | 'moderator' = 'parti
   const payload = {
     apikey: VIDEOSDK_API_KEY,
     permissions: role === 'moderator' 
-      ? ['allow_join', 'allow_mod'] 
-      : ['allow_join'], 
+      ? ['allow_join', 'allow_mod', 'allow_publish']  // <--- Added allow_publish
+      : ['allow_join', 'allow_publish'],               // <--- Added allow_publish
     version: 2,
     roles: [role] 
   };
 
   // @ts-ignore
   return jwt.sign(payload, VIDEOSDK_SECRET_KEY as string, options);
-};
+};;
 
 export const createMeetingRoom = async () => {
   try {

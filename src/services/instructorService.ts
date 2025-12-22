@@ -58,9 +58,9 @@ class InstructorService {
     const today = getISTDate();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const todayName = days[today.getDay()] || '';
-    
-    const startOfDay = new Date(today.setHours(0,0,0,0));
-    const endOfDay = new Date(today.setHours(23,59,59,999));
+
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
     return await prisma.time_table.findMany({
       where: {
@@ -109,7 +109,15 @@ class InstructorService {
       where: {
         instructor_id: userId,
         status: 'live',
-        start_time: { gte: new Date(new Date().getTime() - 12 * 60 * 60 * 1000) } 
+
+        // [FIX] ADD THIS: Only resume if it matches the requested COURSE
+        lesson: {
+          module: {
+            course_id: schedule.course_id
+          }
+        },
+
+        start_time: { gte: new Date(new Date().getTime() - 12 * 60 * 60 * 1000) }
       }
     });
 
@@ -127,7 +135,7 @@ class InstructorService {
     // Get Month Name (e.g., "December")
     const monthName = istDate.toLocaleString('default', { month: 'long' });
     const year = istDate.getFullYear();
-    
+
     // Module Name: "Live Classes - December 2025"
     const moduleName = `Live Classes - ${monthName} ${year}`;
 
@@ -170,7 +178,7 @@ class InstructorService {
         data: {
           module_id: module.module_id,
           title: `${topic} (${istDate.getDate()} ${monthName})`, // e.g. "Physics (17 December)"
-          content_type: 'live', 
+          content_type: 'live',
           content_url: '',
           is_free: false,
           lesson_order: nextLessonOrder
@@ -183,7 +191,7 @@ class InstructorService {
       const roomId = await createMeetingRoom();
 
       const startTime = new Date(); // Server time for DB is fine, as long as Logic used IST
-      const estimatedEndTime = new Date(startTime.getTime() + 60 * 60 * 1000); 
+      const estimatedEndTime = new Date(startTime.getTime() + 60 * 60 * 1000);
 
       const liveLecture = await tx.live_lectures.create({
         data: {

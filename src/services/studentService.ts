@@ -15,7 +15,7 @@ export class StudentService {
         // Create Date Range for TODAY (00:00 to 23:59)
         const startOfDay = new Date(today);
         startOfDay.setHours(0, 0, 0, 0);
-        
+
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
 
@@ -51,7 +51,7 @@ export class StudentService {
             },
             include: {
                 course: { select: { title: true, thumbnail_url: true } },
-                module: { select: { title: true } }, 
+                module: { select: { title: true } },
                 instructor: { select: { full_name: true, user_id: true } }
             },
             orderBy: { start_time: 'asc' }
@@ -63,8 +63,16 @@ export class StudentService {
                 where: {
                     instructor_id: slot.instructor_id,
                     status: 'live',
+
+                    // [FIX] ADD THIS: Check if the live class actually belongs to THIS course
+                    lesson: {
+                        module: {
+                            course_id: slot.course_id
+                        }
+                    },
+
                     // Check if a live room was created in the last 12 hours
-                    start_time: { gte: new Date(Date.now() - 12 * 60 * 60 * 1000) } 
+                    start_time: { gte: new Date(Date.now() - 12 * 60 * 60 * 1000) }
                 }
             });
 
@@ -164,7 +172,7 @@ export class StudentService {
                 module: { select: { title: true } }
             },
             orderBy: [
-                { course_id: 'asc' }, 
+                { course_id: 'asc' },
                 { start_time: 'asc' }
             ]
         });
