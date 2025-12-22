@@ -146,8 +146,7 @@ model lessons {
   duration     Int?     // In minutes
   is_free      Boolean  @default(false) // Demo Class
 
-  // 2. Polymorphic Relations (For Live Classes & Quizzes)
-  live_lecture      live_lectures?
+  live_lecture      live_lectures[]
 
   module       syllabus_modules @relation(fields: [module_id], references: [module_id], onDelete: Cascade)
   
@@ -158,8 +157,8 @@ model lessons {
 
 model live_lectures {
   live_lecture_id Int      @id @default(autoincrement())
-  lesson_id       Int      @unique // One-to-One with Lesson
-  
+  lesson_id       Int      
+
   // VideoSDK Specific Fields
   room_id         String   @db.VarChar(100) 
   meeting_url     String?  @db.VarChar(500) 
