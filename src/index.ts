@@ -20,7 +20,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // WEBHOOK ROUTE (Public)
-app.post('/api/webhooks/videosdk', videoSdkWebhook);
+app.post('/api/webhook/videosdk', videoSdkWebhook);
 
 // Register Routes
 app.use('/api', AuthRoutes);

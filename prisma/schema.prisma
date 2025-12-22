@@ -206,6 +206,7 @@ model attendance {
   live_lecture_id Int
   user_id         Int
   status          AttendanceStatus @default(absent)
+  duration_seconds  Int @default(0)
   recorded_at     DateTime @default(now())
 
   live_lecture    live_lectures @relation(fields: [live_lecture_id], references: [live_lecture_id])

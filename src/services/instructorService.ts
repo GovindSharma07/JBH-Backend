@@ -173,17 +173,39 @@ class InstructorService {
       });
       const nextLessonOrder = (lastLesson?.lesson_order || 0) + 1;
 
-      // 3. Create Lesson Placeholder
-      const lesson = await tx.lessons.create({
-        data: {
+      
+      // 3. Find or Create Lesson (FIXED)
+      // Check if a lesson for this module already exists TODAY
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      let lesson = await tx.lessons.findFirst({
+        where: {
           module_id: module.module_id,
-          title: `${topic} (${istDate.getDate()} ${monthName})`, // e.g. "Physics (17 December)"
-          content_type: 'live',
-          content_url: '',
-          is_free: false,
-          lesson_order: nextLessonOrder
+          // Assuming 'created_at' exists or we filter by name pattern containing date
+          title: { contains: `(${istDate.getDate()} ${monthName})` }
         }
       });
+
+      if (!lesson) {
+        // Only create NEW lesson if one doesn't exist for today
+        const lastLesson = await tx.lessons.findFirst({
+          where: { module_id: module.module_id },
+          orderBy: { lesson_order: 'desc' }
+        });
+        const nextLessonOrder = (lastLesson?.lesson_order || 0) + 1;
+
+        lesson = await tx.lessons.create({
+          data: {
+            module_id: module.module_id,
+            title: `${topic} (${istDate.getDate()} ${monthName})`,
+            content_type: 'live',
+            content_url: '',
+            is_free: false,
+            lesson_order: nextLessonOrder
+          }
+        });
+      }
 
       // 4. Create VideoSDK Room
       // (Note: We call external API outside transaction usually, but here needed for DB insert. 
@@ -218,21 +240,69 @@ class InstructorService {
   /**
    * 4. End Live Class
    */
-  static async endLiveClass(userId: number, liveLectureId: number) {
-    const lecture = await prisma.live_lectures.findUnique({
-      where: { live_lecture_id: liveLectureId }
+ static async endLiveClass(userId: number, liveLectureId: number) {
+    // 1. Mark current session as completed
+    const lecture = await prisma.live_lectures.update({
+        where: { live_lecture_id: liveLectureId },
+        data: { status: 'completed', end_time: new Date() }
     });
 
-    if (!lecture) throw new AppError("Lecture not found", 404);
-    if (lecture.instructor_id !== userId) throw new AppError("Unauthorized", 403);
+    // 2. TRIGGER ATTENDANCE CALCULATION
+    await this.calculateAttendance(lecture.lesson_id);
 
-    return await prisma.live_lectures.update({
-      where: { live_lecture_id: liveLectureId },
-      data: {
-        status: 'completed',
-        end_time: new Date()
-      }
+    return { success: true };
+  }
+
+  // --- NEW HELPER METHOD ---
+  static async calculateAttendance(lessonId: number) {
+    // A. Get Total Class Duration (Sum of all sessions for this lesson)
+    const allSessions = await prisma.live_lectures.findMany({
+        where: { lesson_id: lessonId, status: 'completed' },
+        select: { start_time: true, end_time: true }
     });
+
+    let totalClassSeconds = 0;
+    allSessions.forEach(session => {
+        const diff = (session.end_time.getTime() - session.start_time.getTime()) / 1000;
+        totalClassSeconds += diff;
+    });
+
+    if (totalClassSeconds === 0) return; // Avoid division by zero
+
+    // B. Get All Students who attended ANY session of this lesson
+    // We need to aggregate their duration across all live_lectures of this lesson
+    const attendances = await prisma.attendance.findMany({
+        where: { 
+            live_lecture: { lesson_id: lessonId } 
+        }
+    });
+
+    // Group by User
+    const userDurations: Record<number, number> = {};
+    attendances.forEach(a => {
+        userDurations[a.user_id] = (userDurations[a.user_id] || 0) + a.duration_seconds;
+    });
+
+    // C. Apply 75% Rule
+    const threshold = totalClassSeconds * 0.75;
+
+    // Use a transaction to update everyone
+    const updates = Object.keys(userDurations).map(userId => {
+        const spent = userDurations[Number(userId)] || 0;
+        const newStatus = spent >= threshold ? 'present' : 'absent';
+        
+        // Update all attendance rows for this user/lesson to the final status
+        // (Or ideally, you have a separate 'LessonAttendance' table)
+        return prisma.attendance.updateMany({
+            where: { 
+                user_id: Number(userId),
+                live_lecture: { lesson_id: lessonId }
+            },
+            data: { status: newStatus }
+        });
+    });
+
+    await prisma.$transaction(updates);
   }
 }
 

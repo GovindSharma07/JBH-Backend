@@ -1,7 +1,7 @@
 import prisma from '../utils/prisma'; // Use Singleton
 
 export class WebhookService {
-  
+
   static async handleVideoSdkWebhook(body: any) {
     const { webhookType, data } = body;
     console.log(`📥 Webhook Received: ${webhookType}`, data);
@@ -26,30 +26,30 @@ export class WebhookService {
       const cdnUrl = process.env.CLOUDFLARE_CDN_URL;
       const bucketName = process.env.B2_BUCKET_NAME;
       const region = process.env.B2_REGION;
-      
+
       let playbackUrl = '';
       if (cdnUrl) {
-         const cleanCdn = cdnUrl.replace(/\/$/, "");
-         playbackUrl = `${cleanCdn}/${filePath}`;
+        const cleanCdn = cdnUrl.replace(/\/$/, "");
+        playbackUrl = `${cleanCdn}/${filePath}`;
       } else if (bucketName && region) {
-         playbackUrl = `https://${bucketName}.s3.${region}.backblazeb2.com/${filePath}`;
+        playbackUrl = `https://${bucketName}.s3.${region}.backblazeb2.com/${filePath}`;
       }
 
       await prisma.$transaction([
         prisma.lessons.update({
           where: { lesson_id: liveLecture.lesson_id },
           data: {
-            content_type: 'video', 
+            content_type: 'video',
             content_url: playbackUrl,
-            duration: duration ? Math.round(duration / 60) : 0 
+            duration: duration ? Math.round(duration / 60) : 0
           }
         }),
         prisma.live_lectures.update({
           where: { live_lecture_id: liveLecture.live_lecture_id },
-          data: { 
+          data: {
             status: 'completed',
-            meeting_url: playbackUrl, 
-            end_time: new Date() 
+            meeting_url: playbackUrl,
+            end_time: new Date()
           }
         })
       ]);
@@ -62,13 +62,41 @@ export class WebhookService {
       if (liveLecture.status === 'live') {
         await prisma.live_lectures.update({
           where: { live_lecture_id: liveLecture.live_lecture_id },
-          data: { 
+          data: {
             status: 'completed',
-            end_time: new Date() 
+            end_time: new Date()
           }
         });
         console.log(`⚠️ Session ended (no recording), marked as completed: ${roomId}`);
       }
+    }
+
+    // Inside handleVideoSdkWebhook
+    if (webhookType === 'participant-left') {
+      const { duration, data: { participantId } } = body; // Adjust based on actual payload
+
+      // VideoSDK returns duration in seconds
+      const seconds = Math.round(duration);
+
+      // Update the DB
+      await prisma.attendance.upsert({
+        where: {
+          live_lecture_id_user_id: {
+            live_lecture_id: liveLecture.live_lecture_id,
+            user_id: Number(participantId) // Ensure this is a number
+          }
+        },
+        update: {
+          // Increment duration in case they joined/left multiple times
+          duration_seconds: { increment: seconds }
+        },
+        create: {
+          live_lecture_id: liveLecture.live_lecture_id,
+          user_id: Number(participantId),
+          duration_seconds: seconds,
+          status: 'absent' // Default is absent until calculation
+        }
+      });
     }
 
     return null;
