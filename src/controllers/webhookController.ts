@@ -7,6 +7,7 @@ export const videoSdkWebhook = async (req: Request, res: Response) => {
 
   try {
     await WebhookService.handleVideoSdkWebhook(req.body);
+    console.log("✅ Webhook processed successfully.");
     return res.status(200).send('OK');
   } catch (error) {
     console.error("❌ Webhook Controller Error:", error);

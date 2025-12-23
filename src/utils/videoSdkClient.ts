@@ -16,6 +16,8 @@ export const generateVideoSDKToken = (role: 'participant' | 'moderator' = 'parti
     version: 2,
     roles: [role]
   };
+
+  console.log("Generating VideoSDK Token with payload:", payload);
   // @ts-ignore
   return jwt.sign(payload, VIDEOSDK_SECRET_KEY as string, options);
 };
@@ -29,8 +31,10 @@ export const createMeetingRoom = async () => {
     }, {
       headers: { Authorization: token }
     });
+    console.log("Created VideoSDK Room:", response.data);
     return response.data.roomId;
   } catch (error) {
+    console.error("Error creating VideoSDK room:", error);
     throw new AppError('Failed to create room', 500);
   }
 };
@@ -40,6 +44,7 @@ const getActiveSessionId = async (roomId: string) => {
   const response = await axios.get(`${VIDEOSDK_API_ENDPOINT}/sessions?roomId=${roomId}&status=active`, {
     headers: { Authorization: token }
   });
+  console.log("Active Sessions Response:", response.data);
   return response.data.data?.[0]?.id; // Returns the current session ID
 };
 
@@ -66,6 +71,8 @@ export const startMeetingRecording = async (roomId: string, instructorId: string
       }
     }, { headers: { Authorization: token } });
 
+    console.log(`🎬 Recording started for Room ${roomId}`);
+
     // B. GLOBALLY PIN the Instructor (Must use SESSION ID)
     // Add a delay to ensure the recording bot has joined the session
     setTimeout(async () => {
@@ -81,9 +88,10 @@ export const startMeetingRecording = async (roomId: string, instructorId: string
         console.error("Failed to pin instructor globally:", e);
       }
     }, 5000); // 5s delay is safer for the bot to join
-
+    console.log(`Recording initiation process completed for Room ${roomId}`);
     return { success: true };
   } catch (error: any) {
+    console.error("Error starting recording:", error.response?.data || error.message);
     if (error?.response?.data?.msg?.includes("already")) return { status: "ALREADY_STARTED" };
     throw new AppError('Failed to start recording', 500);
   }
