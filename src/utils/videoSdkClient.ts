@@ -27,7 +27,19 @@ export const createMeetingRoom = async () => {
   try {
     const token = generateVideoSDKToken('moderator');
     const response = await axios.post(`${VIDEOSDK_API_ENDPOINT}/rooms`, {
-      name: "Live Class Room"
+      name: "Live Class Room",
+      webhook: {
+        url: "https://jbh-backend.onrender.com/api/webhook/videosdk",
+        events: [
+          "session-started", 
+          "session-ended", 
+          "participant-joined", 
+          "participant-left",
+          "recording-started",
+          "recording-stopped",
+          "recording-failed"
+        ]
+      }
     }, {
       headers: { Authorization: token }
     });
