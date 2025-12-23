@@ -50,7 +50,7 @@ export const startMeetingRecording = async (roomId: string, instructorId: string
     // A. Start Recording with Spotlight/Pin Layout
     await axios.post(`${VIDEOSDK_API_ENDPOINT}/recordings/start`, {
       roomId,
-      webhookUrl: process.env.VIDEOSDK_WEBHOOK_ENDPOINT,
+      webhookUrl: "https://jbh-backend.onrender.com/api/webhook/videosdk",
       awsLayer: {
         accessKeyId: process.env.B2_KEY_ID,
         secretAccessKey: process.env.B2_APP_KEY,
