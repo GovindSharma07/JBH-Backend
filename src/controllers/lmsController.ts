@@ -25,7 +25,7 @@ class LmsController {
             });
         } catch (e) { next(e); }
     };
-    
+
 
     // --- INSTRUCTOR ---
 
@@ -149,21 +149,24 @@ class LmsController {
     };
 
     // [NEW] Method to trigger recording
-  static async triggerRecording(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { roomId } = req.body;
-      if (!roomId) throw new AppError("Room ID is required", 400);
+    static async triggerRecording(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { roomId, participantId } = req.body;
 
-      await startMeetingRecording(roomId);
+            if (!roomId || !participantId) {
+                throw new AppError("Room ID and Participant ID are required", 400);
+            }
 
-      res.status(200).json({
-        status: 'success',
-        message: 'Recording started successfully with Backblaze storage.'
-      });
-    } catch (error) {
-      next(error);
+            const result = await startMeetingRecording(roomId, participantId);
+
+            res.status(200).json({
+                status: 'success',
+                message: 'Instructor-only recording started.',
+                data: result
+            });
+        } catch (error) {
+            next(error);
+        }
     }
-  }
 }
-
 export default LmsController;
