@@ -10,8 +10,8 @@ export const generateVideoSDKToken = (role: 'participant' | 'moderator' = 'parti
   const options = { expiresIn: '24h', algorithm: 'HS256' };
   const payload = {
     apikey: VIDEOSDK_API_KEY,
-    permissions: role === 'moderator' 
-      ? ['allow_join', 'allow_mod', 'allow_publish', 'allow_recording'] 
+    permissions: role === 'moderator'
+      ? ['allow_join', 'allow_mod', 'allow_publish', 'allow_recording']
       : ['allow_join'],
     version: 2,
     roles: [role]
@@ -34,56 +34,57 @@ export const createMeetingRoom = async () => {
     throw new AppError('Failed to create room', 500);
   }
 };
+// 1. Helper to get Active Session ID
+const getActiveSessionId = async (roomId: string) => {
+  const token = generateVideoSDKToken('moderator');
+  const response = await axios.get(`${VIDEOSDK_API_ENDPOINT}/sessions?roomId=${roomId}&status=active`, {
+    headers: { Authorization: token }
+  });
+  return response.data.data?.[0]?.id; // Returns the current session ID
+};
 
-// 2. Start Recording (Instructor Only Mode)
 export const startMeetingRecording = async (roomId: string, instructorId: string) => {
   try {
     const token = generateVideoSDKToken('moderator');
-    
-    // Step A: Start Recording
-    // Layout "SPOTLIGHT" with priority "PIN" means "Record whoever is pinned"
+
+    // A. Start Recording with Spotlight/Pin Layout
     await axios.post(`${VIDEOSDK_API_ENDPOINT}/recordings/start`, {
-      roomId: roomId,
+      roomId,
       webhookUrl: process.env.VIDEOSDK_WEBHOOK_ENDPOINT,
       awsLayer: {
         accessKeyId: process.env.B2_KEY_ID,
         secretAccessKey: process.env.B2_APP_KEY,
         bucketName: process.env.B2_BUCKET_NAME,
         endpoint: process.env.B2_ENDPOINT,
-        region: process.env.B2_REGION || 'us-east-1'
+        region: process.env.B2_REGION
       },
       config: {
-        layout: {
-          type: "SPOTLIGHT",
-          priority: "PIN", 
-          gridSize: 2,
-        },
+        layout: { type: "SPOTLIGHT", priority: "PIN", gridSize: 1 },
         theme: "DARK",
         mode: "video-and-audio",
         quality: "med",
-        orientation: "landscape",
       }
     }, { headers: { Authorization: token } });
 
-    // Step B: GLOBALLY PIN the Instructor
-    // This forces the Recorder to look at the Instructor
-    // Note: We wait 1s to ensure the recording bot has joined, or fire-and-forget
+    // B. GLOBALLY PIN the Instructor (Must use SESSION ID)
+    // Add a delay to ensure the recording bot has joined the session
     setTimeout(async () => {
-        try {
-            await axios.post(`${VIDEOSDK_API_ENDPOINT}/sessions/${roomId}/participants/${instructorId}/pin`, {
-                "state": { "cam": true, "share": true } // Pin both Camera and Screen Share
-            }, { headers: { Authorization: token } });
-            console.log(`📌 Instructor ${instructorId} pinned for recording.`);
-        } catch (e) {
-            console.error("Failed to pin instructor:", e);
+      try {
+        const sessionId = await getActiveSessionId(roomId);
+        if (sessionId) {
+          await axios.post(`${VIDEOSDK_API_ENDPOINT}/sessions/${sessionId}/participants/${instructorId}/pin`, {
+            "state": { "cam": true, "share": true }
+          }, { headers: { Authorization: token } });
+          console.log(`📌 Instructor ${instructorId} pinned globally in session ${sessionId}`);
         }
-    }, 2000);
+      } catch (e) {
+        console.error("Failed to pin instructor globally:", e);
+      }
+    }, 5000); // 5s delay is safer for the bot to join
 
     return { success: true };
   } catch (error: any) {
-    // Ignore if already running
     if (error?.response?.data?.msg?.includes("already")) return { status: "ALREADY_STARTED" };
-    console.error("Recording Error:", error.response?.data);
     throw new AppError('Failed to start recording', 500);
   }
 };
