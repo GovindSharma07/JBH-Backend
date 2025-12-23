@@ -2,16 +2,14 @@ import { Request, Response } from 'express';
 import { WebhookService } from '../services/webhookService';
 
 export const videoSdkWebhook = async (req: Request, res: Response) => {
-  try {
-    // Delegate logic to Service
-    await WebhookService.handleVideoSdkWebhook(req.body);
+  // ✅ 1. IMMEDIATE LOG: This proves VideoSDK hit your server
+  console.log("🔔 Incoming VideoSDK Webhook Payload:", JSON.stringify(req.body, null, 2));
 
-    // Always return 200 OK to VideoSDK so they don't retry the webhook endlessly
+  try {
+    await WebhookService.handleVideoSdkWebhook(req.body);
     return res.status(200).send('OK');
   } catch (error) {
     console.error("❌ Webhook Controller Error:", error);
-    // Even on error, we often send 200 to acknowledge receipt, 
-    // unless you want VideoSDK to retry (then send 500).
-    return res.status(500).send("Webhook Failed");
+    return res.status(200).send("Handled with Error"); // Still send 200 to stop retries
   }
 };

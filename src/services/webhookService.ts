@@ -6,9 +6,14 @@ export class WebhookService {
   static async handleVideoSdkWebhook(body: any) {
     const { webhookType, data } = body;
     
-    // Log important events
-    if (['recording-stopped', 'participant-left', 'session-ended'].includes(webhookType)) {
-        console.log(`📥 Webhook Received: ${webhookType}`, data);
+    // ✅ Add 'recording-failed' and 'recording-started' for visibility
+    if (['recording-stopped', 'recording-failed', 'participant-left', 'session-ended','recording-started'].includes(webhookType)) {
+        console.log(`📥 Webhook Event: ${webhookType}`, data);
+    }
+
+    if (webhookType === 'recording-failed') {
+        console.error(`❌ RECORDING FAILED: Room ${data.roomId}. Reason: ${data.error}`);
+        return;
     }
 
     const { roomId, filePath, duration, participantId } = data;
