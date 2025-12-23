@@ -1,10 +1,10 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import InstructorService from '../services/instructorService';
 import { StudentService } from '../services/studentService';
 import LessonService from '../services/lessonService';
 import { AppError } from '../utils/errors';
 import { AuthenticatedRequest } from '../utils/types';
-import { generateVideoSDKToken } from '../utils/videoSdkClient';
+import { generateVideoSDKToken, startMeetingRecording } from '../utils/videoSdkClient';
 
 class LmsController {
     static endLiveClass = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -147,6 +147,23 @@ class LmsController {
             res.json({ success: true, schedule });
         } catch (e) { next(e); }
     };
+
+    // [NEW] Method to trigger recording
+  static async triggerRecording(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { roomId } = req.body;
+      if (!roomId) throw new AppError("Room ID is required", 400);
+
+      await startMeetingRecording(roomId);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Recording started successfully with Backblaze storage.'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default LmsController;

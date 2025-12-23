@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateUser, authorizeRoles } from '../middlewares/authMiddleware';
+import AuthMiddleware, { authenticateUser, authorizeRoles } from '../middlewares/authMiddleware';
 import LmsController from '../controllers/lmsController';
 import { validate } from '../middlewares/validate';
 import { joinClassSchema,startClassSchema } from '../utils/validators';
@@ -63,6 +63,13 @@ router.post(
 
 router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
 
+
+router.post(
+    '/recording/start', 
+    authenticateUser, 
+    authorizeRoles('instructor', 'admin'), 
+    LmsController.triggerRecording
+);
 
 
 
