@@ -4,7 +4,7 @@ import { StudentService } from '../services/studentService';
 import LessonService from '../services/lessonService';
 import { AppError } from '../utils/errors';
 import { AuthenticatedRequest } from '../utils/types';
-import { generateVideoSDKToken, startMeetingRecording } from '../utils/videoSdkClient';
+import { generateVideoSDKToken } from '../utils/videoSdkClient';
 
 class LmsController {
     static endLiveClass = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -147,26 +147,5 @@ class LmsController {
             res.json({ success: true, schedule });
         } catch (e) { next(e); }
     };
-
-    // [NEW] Method to trigger recording
-    static async triggerRecording(req: Request, res: Response, next: NextFunction) {
-        try {
-            const { roomId, participantId } = req.body;
-
-            if (!roomId || !participantId) {
-                throw new AppError("Room ID and Participant ID are required", 400);
-            }
-
-            const result = await startMeetingRecording(roomId, participantId);
-
-            res.status(200).json({
-                status: 'success',
-                message: 'Instructor-only recording started.',
-                data: result
-            });
-        } catch (error) {
-            next(error);
-        }
-    }
 }
 export default LmsController;

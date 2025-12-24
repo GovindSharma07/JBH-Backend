@@ -7,7 +7,13 @@ export class WebhookService {
     const { webhookType, data } = body;
     
     // ✅ Add 'recording-failed' and 'recording-started' for visibility
-    if (['recording-stopped', 'recording-failed', 'participant-left', 'session-ended','recording-started'].includes(webhookType)) {
+    if ([
+      'recording-started',
+      'recording-stopped',
+      'recording-failed',
+      'participant-joined',
+      'participant-left',
+      'session-ended'].includes(webhookType)) {
         console.log(`📥 Webhook Event: ${webhookType}`, data);
     }
 
@@ -111,6 +117,7 @@ export class WebhookService {
     // CASE 3: ATTENDANCE (Participant Left)
     // ====================================================
     if (webhookType === 'participant-left') {
+      if (participantId == "instructor") return null;
       const seconds = duration ? Math.round(duration) : 0;
 
       // Ensure participantId is a valid User ID (Number)
@@ -135,6 +142,17 @@ export class WebhookService {
       }
     }
 
+    if (webhookType === 'participant-joined') {
+      console.log(`👤 Participant Joined: ${participantId} in Room: ${roomId}`);
+    }
+
+    if (webhookType === 'recording-started') {
+      console.log(`🎬 Recording Started for Room: ${roomId}`);
+    }
+
+    if(webhookType === 'session-failed') {
+      console.error(`❌ SESSION FAILED: Room ${data.roomId}. Reason: ${data.error}`);
+    }
     return null;
   }
 }

@@ -61,16 +61,6 @@ router.post(
     LmsController.endLiveClass
 );
 
-router.get("/instructor/dashboard", authenticateUser,LmsController.getInstructorDashboard);
-
-
-router.post(
-    '/recording/start', 
-    authenticateUser, 
-    authorizeRoles('instructor', 'admin'), 
-    LmsController.triggerRecording
-);
-
 
 
 
