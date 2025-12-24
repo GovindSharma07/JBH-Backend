@@ -49,3 +49,45 @@ export const createMeetingRoom = async () => {
     throw new AppError('Failed to create room', 500);
   }
 };
+
+/**
+ * Starts recording for a specific participant in a room.
+ * * @param roomId - The ID of the room where the session is active.
+ * @param participantId - The ID of the participant to be recorded.
+ * @param options - Optional configuration for the recording (webhook, file format, etc.)
+ */
+export const startParticipantRecording = async (
+  roomId: string, 
+  participantId: string,
+) => {
+  try {
+    // Generate a token with moderator permissions (required for recording)
+    const token = generateVideoSDKToken('moderator');
+
+    const response = await axios.post(
+      `${VIDEOSDK_API_ENDPOINT}/recordings/participant/start`,
+      {
+        roomId,
+        participantId,
+        webhookUrl: "https://jbh-backend.onrender.com/api/webhook/videosdk",
+      },
+      {
+        headers: { 
+          Authorization: token,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    console.log(`Recording started for participant ${participantId} in room ${roomId}`);
+    return response.data;
+  } catch (error: any) {
+    console.error("Error starting participant recording:", error.response?.data || error.message);
+    
+    // Maintain consistency with your error handling
+    throw new AppError(
+      error.response?.data?.message || 'Failed to start participant recording', 
+      error.response?.status || 500
+    );
+  }
+};
