@@ -18,12 +18,12 @@ export class WebhookService {
       console.log(`📥 Webhook Event: ${webhookType}`, data);
     }
 
-    const { roomId, filePath, duration, participantId } = data;
-    if (!roomId) return null;
+    const { meetingId, filePath, duration, participantId } = data;
+    if (!meetingId) return null;
 
     // FIND THE LECTURE
     const liveLecture = await prisma.live_lectures.findFirst({
-      where: { room_id: roomId },
+      where: { room_id: meetingId },
       include: { lesson: true }
     });
 
@@ -33,8 +33,8 @@ export class WebhookService {
     if (webhookType === 'participant-joined') {
       if (participantId === "instructor") {
         try {
-          console.log(`🎙️ Instructor joined. Starting recording for Room: ${roomId}`);
-          await startParticipantRecording(roomId, participantId);
+          console.log(`🎙️ Instructor joined. Starting recording for Room: ${meetingId}`);
+          await startParticipantRecording(meetingId, participantId);
         } catch (err) {
           console.error("❌ Error starting participant recording:", err);
         }
@@ -102,7 +102,7 @@ export class WebhookService {
       }
 
       await prisma.$transaction([updateLiveLecture, ...lessonUpdates]);
-      console.log(`🎥 Participant Recording saved for Room ${roomId}: ${playbackUrl}`);
+      console.log(`🎥 Participant Recording saved for Room ${meetingId}: ${playbackUrl}`);
       return { success: true };
     }
 
