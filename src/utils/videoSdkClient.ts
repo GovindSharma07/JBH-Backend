@@ -50,12 +50,7 @@ export const createMeetingRoom = async () => {
   }
 };
 
-/**
- * Starts recording for a specific participant in a room.
- * * @param roomId - The ID of the room where the session is active.
- * @param participantId - The ID of the participant to be recorded.
- * @param options - Optional configuration for the recording (webhook, file format, etc.)
- */
+
 export const startParticipantRecording = async (
   roomId: string, 
   participantId: string,

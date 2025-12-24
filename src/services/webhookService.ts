@@ -1,31 +1,24 @@
-import { videoSdkWebhook } from '../controllers/webhookController';
 import prisma from '../utils/prisma';
 import { startParticipantRecording } from '../utils/videoSdkClient';
 import { AttendanceService } from './attendanceService';
 
 export class WebhookService {
-
   static async handleVideoSdkWebhook(body: any) {
     const { webhookType, data } = body;
 
-    // ✅ Add 'recording-failed' and 'recording-started' for visibility
+    // Monitor relevant events
     if ([
-      'recording-started',
-      'recording-stopped',
-      'recording-failed',
+      'participant-recording-started',
+      'participant-recording-stopped',
+      'participant-recording-failed',
       'participant-joined',
       'participant-left',
-      'session-ended'].includes(webhookType)) {
+      'session-ended'
+    ].includes(webhookType)) {
       console.log(`📥 Webhook Event: ${webhookType}`, data);
     }
 
-    if (webhookType === 'recording-failed') {
-      console.error(`❌ RECORDING FAILED: Room ${data.roomId}. Reason: ${data.error}`);
-      return;
-    }
-
     const { roomId, filePath, duration, participantId } = data;
-
     if (!roomId) return null;
 
     // FIND THE LECTURE
@@ -34,32 +27,56 @@ export class WebhookService {
       include: { lesson: true }
     });
 
-    if (!liveLecture) {
-      // It might be a test room or old room, safe to ignore if not found
-      return null;
+    if (!liveLecture) return null;
+
+    // 1. HANDLE PARTICIPANT JOINED (Start Recording if Instructor)
+    if (webhookType === 'participant-joined') {
+      if (participantId === "instructor") {
+        try {
+          console.log(`🎙️ Instructor joined. Starting recording for Room: ${roomId}`);
+          await startParticipantRecording(roomId, participantId);
+        } catch (err) {
+          console.error("❌ Error starting participant recording:", err);
+        }
+      }
+      return { success: true };
     }
 
-    // ====================================================
-    // CASE 1: RECORDING STOPPED (Save Video)
-    // ====================================================
-    if (webhookType === 'recording-stopped' && filePath) {
-      // 1. Construct the Playback URL
-      const cdnUrl = process.env.CLOUDFLARE_CDN_URL;
-      const bucketName = process.env.B2_BUCKET_NAME;
-      const region = process.env.B2_REGION;
+    // 2. HANDLE PARTICIPANT LEFT (Calculate Attendance)
+    if (webhookType === 'participant-left') {
+      // Logic: If the ID is a number (student), update attendance
+      const userId = Number(participantId);
+      
+      if (!isNaN(userId)) {
+        const seconds = duration ? Math.round(duration) : 0;
+        console.log(`📊 Recording attendance for User: ${userId}, Duration: ${seconds}s`);
 
-      let playbackUrl = '';
-      if (cdnUrl) {
-        const cleanCdn = cdnUrl.replace(/\/$/, "");
-        playbackUrl = `${cleanCdn}/${filePath}`;
-      } else if (bucketName && region) {
-        playbackUrl = `https://${bucketName}.s3.${region}.backblazeb2.com/${filePath}`;
-      } else {
-        // Fallback if no custom storage is configured (VideoSDK Storage)
-        playbackUrl = data.fileUrl || "";
+        await prisma.attendance.upsert({
+          where: {
+            live_lecture_id_user_id: {
+              live_lecture_id: liveLecture.live_lecture_id,
+              user_id: userId
+            }
+          },
+          update: {
+            duration_seconds: { increment: seconds }
+          },
+          create: {
+            live_lecture_id: liveLecture.live_lecture_id,
+            user_id: userId,
+            duration_seconds: seconds,
+            status: 'absent' // FinalizeAttendance will flip this to 'present' if criteria met
+          }
+        });
       }
+      return { success: true };
+    }
 
-      // 2. Update Live Lecture (Fragment)
+    // 3. HANDLE PARTICIPANT RECORDING STOPPED (Save to DB)
+    if (webhookType === 'participant-recording-stopped' && filePath) {
+      const playbackUrl = this.generatePlaybackUrl(filePath, data.fileUrl);
+
+      // Update Live Lecture status
       const updateLiveLecture = prisma.live_lectures.update({
         where: { live_lecture_id: liveLecture.live_lecture_id },
         data: {
@@ -69,7 +86,7 @@ export class WebhookService {
         }
       });
 
-      // 3. Update Lesson (Main URL) only if empty
+      // Update Lesson Content only if not already set
       const lessonUpdates = [];
       if (!liveLecture.lesson.content_url || liveLecture.lesson.content_url.trim() === '') {
         lessonUpdates.push(
@@ -85,82 +102,43 @@ export class WebhookService {
       }
 
       await prisma.$transaction([updateLiveLecture, ...lessonUpdates]);
-      console.log(`🎥 Recording saved for Room ${roomId}`);
+      console.log(`🎥 Participant Recording saved for Room ${roomId}: ${playbackUrl}`);
       return { success: true };
     }
 
-    // ====================================================
-    // CASE: SESSION ENDED (Finalize Attendance)
-    // ====================================================
+    // 4. HANDLE SESSION ENDED
     if (webhookType === 'session-ended') {
-      console.log(`🏁 Session Ended for Room: ${roomId}. Finalizing Attendance...`);
+      await prisma.live_lectures.update({
+        where: { live_lecture_id: liveLecture.live_lecture_id },
+        data: {
+          status: 'completed',
+          end_time: new Date()
+        }
+      });
 
-      if (liveLecture) {
-        // 1. Mark Lecture as Completed
-        await prisma.live_lectures.update({
-          where: { live_lecture_id: liveLecture.live_lecture_id },
-          data: {
-            status: 'completed',
-            end_time: new Date()
-          }
-        });
+      // Finalize attendance after a short delay
+      setTimeout(() => {
+        AttendanceService.finalizeAttendance(liveLecture.live_lecture_id)
+          .catch(err => console.error("❌ Attendance Finalization Failed:", err));
+      }, 10000);
 
-        // 2. TRIGGER FINALIZATION (With a small delay to catch late 'participant-left' hooks)
-        // We don't await this so the webhook response is fast (200 OK)
-        setTimeout(() => {
-          AttendanceService.finalizeAttendance(liveLecture.live_lecture_id)
-            .catch(err => console.error("❌ Attendance Finalization Failed:", err));
-        }, 10000); // 10 Second Delay
-      }
       return { success: true };
     }
 
-    // ====================================================
-    // CASE 3: ATTENDANCE (Participant Left)
-    // ====================================================
-    if (webhookType === 'participant-left') {
-      if (participantId == "instructor") return null;
-      const seconds = duration ? Math.round(duration) : 0;
-
-      // Ensure participantId is a valid User ID (Number)
-      if (participantId && !isNaN(Number(participantId))) {
-        await prisma.attendance.upsert({
-          where: {
-            live_lecture_id_user_id: {
-              live_lecture_id: liveLecture.live_lecture_id,
-              user_id: Number(participantId)
-            }
-          },
-          update: {
-            duration_seconds: { increment: seconds }
-          },
-          create: {
-            live_lecture_id: liveLecture.live_lecture_id,
-            user_id: Number(participantId),
-            duration_seconds: seconds,
-            status: 'absent'
-          }
-        });
-      }
-    }
-
-    if (webhookType === 'participant-joined') {
-      if (participantId != "instructor") return null;
-      try {
-        await startParticipantRecording(roomId, participantId);
-      }
-      catch (err) {
-        console.error("❌ Error starting participant recording:", err);
-      }
-    }
-
-    if (webhookType === 'recording-started') {
-      console.log(`🎬 Recording Started for Room: ${roomId}`);
-    }
-
-    if (webhookType === 'session-failed') {
-      console.error(`❌ SESSION FAILED: Room ${data.roomId}. Reason: ${data.error}`);
-    }
     return null;
+  }
+
+  // Helper to construct URLs
+  private static generatePlaybackUrl(filePath: string, fallbackUrl: string): string {
+    const cdnUrl = process.env.CLOUDFLARE_CDN_URL;
+    const bucketName = process.env.B2_BUCKET_NAME;
+    const region = process.env.B2_REGION;
+
+    if (cdnUrl) {
+      return `${cdnUrl.replace(/\/$/, "")}/${filePath}`;
+    } else if (bucketName && region) {
+      return `https://${bucketName}.s3.${region}.backblazeb2.com/${filePath}`;
+    }
+    return fallbackUrl || "";
   }
 }
